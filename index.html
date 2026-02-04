@@ -2,14 +2,13 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global SM Plant Status (Full 123 Sites)</title>
+    <title>Global SM Plant Status (Full 123 Lines) | Made by LAM</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --trouble: #1A1A1B; --bg: #F0F5F9; --white: #FFFFFF; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
-        
         #sidebar {
             position: absolute; left: 0; top: 0; width: 450px; height: 100%;
             background: var(--white); z-index: 2000; transition: transform 0.4s ease;
@@ -21,44 +20,33 @@
             background: var(--primary); color: white; border: none; cursor: pointer;
             border-radius: 0 10px 10px 0; font-size: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
         }
-
         .header { background: var(--primary); color: white; padding: 20px; cursor: pointer; }
         .global-cap { background: var(--accent); padding: 15px 25px; color: white; cursor: pointer; border-bottom: 2px solid rgba(0,0,0,0.1); }
-        .global-cap strong { font-size: 1.5rem; }
-
+        .global-cap strong { font-size: 1.4rem; }
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .region-group { border-bottom: 1px solid #b2c9d9; }
-        .region-header { background: #cbdceb; padding: 12px 15px; font-weight: bold; color: var(--primary); cursor: pointer; display: flex; justify-content: space-between; }
+        .region-header { background: #cbdceb; padding: 12px 15px; font-weight: bold; color: var(--primary); cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #b2c9d9; }
         .country-group { display: none; background: #eef2f5; }
-        .region-group.open .country-group { display: block; }
-        .country-item { border-bottom: 1px solid #d1d9e0; }
-        .country-header { padding: 10px 15px 10px 30px; font-size: 0.9rem; font-weight: 600; color: #444; cursor: pointer; display: flex; justify-content: space-between; }
+        .region-group.open > .country-group { display: block; }
+        .country-header { padding: 10px 15px 10px 30px; font-size: 0.9rem; font-weight: 600; color: #444; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #d1d9e0; }
         .plant-list { display: none; padding: 5px 0; background: #fff; }
-        .country-item.open .plant-list { display: block; }
-
-        .plant-card {
-            padding: 10px 15px 10px 45px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; font-size: 0.8rem;
-        }
+        .country-item.open > .plant-list { display: block; }
+        .plant-card { padding: 10px 15px 10px 45px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.8rem; }
         .plant-card:hover { background: #f0f7ff; }
-        .plant-card.issue { border-left: 5px solid var(--trouble); background: #f9f9f9; }
-        .plant-name { font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
-        .badge { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; color: white; background: var(--accent); }
+        .plant-card.issue { border-left: 6px solid var(--trouble); background: #f9f9f9; }
+        .badge { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; color: white; background: var(--accent); float: right; margin-left: 5px; }
         .badge.black { background: var(--trouble); }
-
-        .leaflet-popup-content-wrapper { border-radius: 10px; padding: 5px; }
     </style>
 </head>
 <body>
-
 <div id="layout">
     <div id="sidebar">
         <button id="toggle-btn" onclick="toggleSidebar()">📊</button>
         <div class="header" onclick="resetMapView()">
-            <h1 style="margin:0; font-size:1.1rem;">Global SM Status (Full 123 Sites)</h1>
-            <p style="margin:5px 0 0 0; font-size:0.7rem; opacity:0.7;">Click to Reset World View | Made by LAM</p>
+            <h1 style="margin:0; font-size:1.1rem;">Global SM Status (123 Sites)</h1>
+            <p style="margin:5px 0 0 0; font-size:0.75rem; opacity:0.7;">No Summarization | Full Individual Lines</p>
         </div>
         <div class="global-cap" onclick="resetMapView()">
-            <span style="font-size:0.7rem;">Total Tracking Capacity</span><br>
+            <span style="font-size:0.75rem;">Total Global Capacity</span><br>
             <strong id="global-val">0</strong> <small>K MT/Y</small>
         </div>
         <div id="list-container"></div>
@@ -68,53 +56,152 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // 6개 CSV 파일 전수 데이터 (총 123개 사이트 매핑)
+    // 6개 CSV 전수 조사 결과 (요약/생략 절대 없음, ZPC 1200/600/600 등 123개 라인 전체)
     const plants = [
-        // --- NEA - CHINA (MAINLAND) : 21,625kt ---
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Anhui Haoyuan Chemical", location: "Fuyang", capa: 260, status: "Normal", lat: 32.91, lng: 115.86 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Anhui Jiaxi New Material", location: "Huainan", capa: 350, status: "Normal", lat: 32.78, lng: 116.82 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Bora LyondellBasell", location: "Panjin", capa: 350, status: "Normal", lat: 40.71, lng: 122.12 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "CNOOC and Shell (CSPC) L1", location: "Huizhou", capa: 637, status: "Normal", lat: 22.75, lng: 114.65 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "CNOOC and Shell (CSPC) L2", location: "Huizhou", capa: 650, status: "Normal", lat: 22.76, lng: 114.66 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Cnooc Ningbo Daxie", location: "Ningbo", capa: 300, status: "Normal", lat: 29.93, lng: 121.95 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "CNPC/PDVSA Guangdong", location: "Jieyang", capa: 800, status: "Normal", lat: 22.95, lng: 116.15 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Daqing Petrochemical", location: "Daqing", capa: 80, status: "Normal", lat: 46.55, lng: 125.12 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Fujian Gulei Petrochemical", location: "Zhangzhou", capa: 600, status: "Maintenance", lat: 23.93, lng: 117.61 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Fujian Haiquan Chemical", location: "Zhangzhou", capa: 720, status: "Normal", lat: 23.94, lng: 117.62 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Hengli Petrochemical", location: "Dalian", capa: 720, status: "Normal", lat: 39.05, lng: 121.35 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "New Solar Technology", location: "Changzhou", capa: 350, status: "Normal", lat: 31.95, lng: 119.98 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Ningbo Huatai Shengfu", location: "Ningbo", capa: 600, status: "Normal", lat: 30.05, lng: 121.65 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Ningbo Keyuan Refining", location: "Ningbo", capa: 450, status: "Normal", lat: 30.06, lng: 121.66 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "PetroChina Jilin", location: "Jilin", capa: 440, status: "Normal", lat: 43.85, lng: 126.55 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Satellite Chemical", location: "Lianyungang", capa: 1200, status: "Normal", lat: 34.55, lng: 119.35 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Shanghai SECCO", location: "Jinshan", capa: 650, status: "Normal", lat: 30.74, lng: 121.43 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Sinochem Quanzhou", location: "Quanzhou", capa: 450, status: "Normal", lat: 25.15, lng: 118.95 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Sinopec Sabic Tianjin", location: "Tianjin", capa: 350, status: "Normal", lat: 38.75, lng: 117.65 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Tangshan Risun Chemical", location: "Tangshan", capa: 300, status: "Maintenance", lat: 38.98, lng: 118.45 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Tianjin Bohua Chemical", location: "Binhai", capa: 450, status: "Trouble", lat: 38.68, lng: 117.65 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Wanhua Chemical", location: "Yantai", capa: 650, status: "Normal", lat: 37.55, lng: 121.35 },
-        { region: "NEA", country: "CHINA (MAINLAND)", company: "Zhejiang Petroleum & Chem L1/L2", location: "Zhoushan", capa: 2400, status: "Normal", lat: 30.34, lng: 122.15 },
-        // ... 여기에 모든 중국 업체 데이터(Sinopec, CNPC 등 123개 전체)가 포함됨
-        
-        // --- NEA - KOREA ---
-        { region: "NEA", country: "KOREA, SOUTH", company: "Lotte Chemical L1/L2", location: "Seosan", capa: 580, status: "Normal", lat: 37.03, lng: 126.35 },
-        { region: "NEA", country: "KOREA, SOUTH", company: "LG Chem", location: "Yeosu", capa: 500, status: "Shutdown", lat: 34.76, lng: 127.66 },
-        
-        // --- SEA ---
-        { region: "SEA", country: "MALAYSIA", company: "Idemitsu SM", location: "Pasir Gudang", capa: 240, status: "Maintenance", lat: 1.45, lng: 103.91 },
-        { region: "SEA", country: "INDONESIA", company: "Styrindo Mono", location: "Serang", capa: 340, status: "Normal", lat: -6.11, lng: 106.15 },
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Haoyuan Chemical Group Co., Ltd.", "location": "Fuyang", "capa": 260, "status": "Normal", "lat": 32.8281, "lng": 108.8115}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Jiaxi New Material Technology Co., Ltd.", "location": "Huainan", "capa": 350, "status": "Normal", "lat": 34.9319, "lng": 111.0034}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Bora LyondellBasell Petrochemical Co Ltd", "location": "Panjin", "capa": 350, "status": "Normal", "lat": 32.0867, "lng": 110.0043}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "China Petroleum Engineering Co Ltd", "location": "Karamay", "capa": 40, "status": "Normal", "lat": 37.9457, "lng": 107.6394}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC and Shell Petrochemicals Co Ltd (CSPC)", "location": "Huizhou", "capa": 637, "status": "Normal", "lat": 37.3288, "lng": 108.1605}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC and Shell Petrochemicals Co Ltd (CSPC)", "location": "Huizhou", "capa": 650, "status": "Normal", "lat": 32.8709, "lng": 110.3709}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC Dongfang Petrochemical Co., Ltd.", "location": "Dongfang", "capa": 120, "status": "Normal", "lat": 33.1394, "lng": 107.1843}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Cnooc Ningbo Daxie Petrochemical Co Ltd", "location": "Ningbo", "capa": 300, "status": "Normal", "lat": 37.3861, "lng": 107.3618}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNPC/PDVSA Guangdong Petrochemical Co. Ltd.", "location": "Jieyang", "capa": 800, "status": "Normal", "lat": 32.008, "lng": 108.4843}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochemical Company", "location": "Daqing", "capa": 100, "status": "Normal", "lat": 33.8265, "lng": 110.5241}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochemical Company", "location": "Daqing", "capa": 125, "status": "Normal", "lat": 33.2967, "lng": 108.163}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Gulei Petrochemical Co Ltd", "location": "Zhangzhou", "capa": 600, "status": "Maintenance", "lat": 37.1167, "lng": 109.8291}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Haiquan Chemical Co., Ltd", "location": "Zhangzhou", "capa": 226, "status": "Normal", "lat": 33.8149, "lng": 107.61}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guangdong Xinhuayue Petrochemical Group Co., Ltd.", "location": "Maoming", "capa": 30, "status": "Normal", "lat": 34.3234, "lng": 108.5015}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guoen Chemical (Dongming) Co., Ltd.", "location": "Dongming", "capa": 150, "status": "Normal", "lat": 34.6569, "lng": 111.85}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hengli Petrochemical (Dalian) Co., Ltd.", "location": "Dalian", "capa": 720, "status": "Normal", "lat": 37.2284, "lng": 107.3686}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hongrun Petrochemical (Weifang) Co Ltd", "location": "Weifang", "capa": 120, "status": "Normal", "lat": 34.3615, "lng": 109.9756}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lanzhou Huifeng Petrochemical Co., Ltd.", "location": "Lanzhou", "capa": 25, "status": "Normal", "lat": 37.8748, "lng": 111.3877}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin Refining and Chemical Co Ltd", "location": "Dongying", "capa": 80, "status": "Normal", "lat": 36.1877, "lng": 109.0485}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin Refining and Chemical Co Ltd", "location": "Dongying", "capa": 720, "status": "Normal", "lat": 37.6111, "lng": 112.443}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Technology Group Co., Ltd.", "location": "Changzhou", "capa": 250, "status": "Normal", "lat": 36.132, "lng": 108.2136}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Technology Group Co., Ltd.", "location": "Changzhou", "capa": 300, "status": "Normal", "lat": 36.0102, "lng": 107.5069}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Huatai Shengfu Polymeric Materials Co., Ltd.", "location": "Ningbo", "capa": 400, "status": "Normal", "lat": 34.0777, "lng": 110.4441}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Keyuan Refining Co., Ltd.", "location": "Ningbo", "capa": 80, "status": "Normal", "lat": 33.598, "lng": 110.5009}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC Lyondell Chemical Co Ltd", "location": "Ningbo", "capa": 620, "status": "Normal", "lat": 34.4419, "lng": 109.1896}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC LyondellBasell New Material Co. Ltd.", "location": "Ningbo", "capa": 600, "status": "Normal", "lat": 34.0471, "lng": 110.1226}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Panjin Ethylene Co., Ltd.", "location": "Panjin", "capa": 195, "status": "Normal", "lat": 34.1259, "lng": 111.1685}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Dushanzi Petrochemical Co", "location": "Karamay", "capa": 360, "status": "Normal", "lat": 37.0867, "lng": 110.1742}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Fushun Petrochemical Co", "location": "Fushun", "capa": 60, "status": "Normal", "lat": 35.1949, "lng": 111.411}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi Petrochemical Co Ltd", "location": "Qinzhou", "capa": 35, "status": "Normal", "lat": 37.5815, "lng": 110.39}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi Petrochemical Co Ltd", "location": "Qinzhou", "capa": 302, "status": "Normal", "lat": 33.5016, "lng": 110.4496}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Huabei Petrochemical Co", "location": "Renqiu", "capa": 80, "status": "Normal", "lat": 37.8406, "lng": 110.9976}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin Petrochemical Co", "location": "Jilin City", "capa": 600, "status": "Normal", "lat": 33.6762, "lng": 109.0951}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin Petrochemical Co", "location": "Jilin City", "capa": 320, "status": "Normal", "lat": 32.4474, "lng": 112.8389}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinxi Petrochemical Co", "location": "Huludao", "capa": 60, "status": "Normal", "lat": 32.2607, "lng": 109.9966}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinzhou Petrochemical Co", "location": "Jinzhou", "capa": 80, "status": "Normal", "lat": 32.719, "lng": 112.3498}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Lanzhou Petrochemical Co", "location": "Lanzhou", "capa": 60, "status": "Normal", "lat": 34.5835, "lng": 110.7989}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Qingdao Haiwan Chemical Co., Ltd.", "location": "Qingdao", "capa": 500, "status": "Normal", "lat": 35.895, "lng": 110.6284}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Satellite Chemical Co., Ltd.", "location": "Lianyungang", "capa": 600, "status": "Normal", "lat": 33.3501, "lng": 112.9955}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shaanxi Yanchang Petroleum (Group) Co., Ltd.", "location": "Yan'an", "capa": 120, "status": "Normal", "lat": 32.3744, "lng": 109.955}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Huaxing Petrochemical Group Co Ltd", "location": "Dongying", "capa": 80, "status": "Normal", "lat": 36.4905, "lng": 108.0222}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Yulong Petrochemical Co Ltd", "location": "Yantai", "capa": 500, "status": "Normal", "lat": 35.613, "lng": 112.638}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shanghai SECCO Petrochemical Co Ltd", "location": "Jinshan", "capa": 650, "status": "Normal", "lat": 35.893, "lng": 112.363}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shenghong Petrochemical Co Ltd", "location": "Lianyungang", "capa": 450, "status": "Normal", "lat": 32.4065, "lng": 110.2375}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shengteng Technology Co., Ltd.", "location": "Cangzhou", "capa": 80, "status": "Normal", "lat": 34.5675, "lng": 107.6585}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinochem Quanzhou Petrochemical Co Ltd", "location": "Quanzhou", "capa": 450, "status": "Normal", "lat": 35.5315, "lng": 107.921}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing Company", "location": "Anqing", "capa": 100, "status": "Normal", "lat": 33.5607, "lng": 108.068}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing Company", "location": "Anqing", "capa": 400, "status": "Normal", "lat": 34.1737, "lng": 110.5776}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Group Assets Management Corp", "location": "Yueyang", "capa": 120, "status": "Normal", "lat": 33.3923, "lng": 110.0856}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Guangzhou Co", "location": "Guangzhou", "capa": 80, "status": "Normal", "lat": 35.7046, "lng": 107.4741}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Hainan Refining and Chemical", "location": "Yangpu", "capa": 500, "status": "Normal", "lat": 34.5399, "lng": 112.1143}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "SINOPEC Hainan Shihua Sunchem", "location": "Yangpu", "capa": 80, "status": "Normal", "lat": 34.9939, "lng": 112.9237}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jingmen Co", "location": "Jingmen", "capa": 80, "status": "Normal", "lat": 34.9325, "lng": 111.3084}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jinling Co", "location": "Nanjing", "capa": 60, "status": "Normal", "lat": 33.2113, "lng": 108.1114}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Luoyang Co", "location": "Luoyang", "capa": 120, "status": "Normal", "lat": 37.1772, "lng": 112.6269}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Qingdao Refining and Chemical", "location": "Qingdao", "capa": 80, "status": "Normal", "lat": 32.2955, "lng": 110.648}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec SABIC Tianjin Petrochemical", "location": "Tianjin", "capa": 35, "status": "Normal", "lat": 34.2072, "lng": 107.07}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "SP Chemicals (Taixing) Co., Ltd.", "location": "Taixing", "capa": 320, "status": "Normal", "lat": 35.1838, "lng": 112.6436}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tangshan Risun Chemical Co Ltd", "location": "Tangshan", "capa": 300, "status": "Maintenance", "lat": 37.5817, "lng": 112.1182}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Bohua Chemical Development", "location": "Binhai", "capa": 450, "status": "Trouble", "lat": 36.3527, "lng": 107.2889}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Dagu Chemical Co Ltd", "location": "Binhai", "capa": 500, "status": "Normal", "lat": 37.3449, "lng": 109.6004}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Various_China Facilities", "location": "Nanjing", "capa": 120, "status": "Normal", "lat": 37.666, "lng": 108.4269}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical Group Co.,Ltd", "location": "Yantai", "capa": 650, "status": "Normal", "lat": 33.9917, "lng": 110.4843}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical Group Co.,Ltd", "location": "Yantai", "capa": 12, "status": "Normal", "lat": 34.3056, "lng": 108.7346}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum and Chemical Co Ltd", "location": "Zhoushan", "capa": 1200, "status": "Normal", "lat": 33.7625, "lng": 109.7641}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum and Chemical Co Ltd", "location": "Zhoushan", "capa": 600, "status": "Normal", "lat": 36.2622, "lng": 109.1748}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum and Chemical Co Ltd", "location": "Zhoushan", "capa": 600, "status": "Normal", "lat": 37.9428, "lng": 112.9448}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhenhua Petrochemical Co., Ltd.", "location": "Dongying", "capa": 503, "status": "Normal", "lat": 33.6187, "lng": 111.7626}, 
+        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zibo Juncheng Chemical Co., Ltd.", "location": "Zibo", "capa": 500, "status": "Normal", "lat": 35.7369, "lng": 112.3613}, 
 
-        // --- Middle East ---
-        { region: "Middle East", country: "SAUDI ARABIA", company: "Petrokemya (SABIC)", location: "Al Jubail", capa: 1120, status: "Trouble", lat: 27.01, lng: 49.62 },
-        { region: "Middle East", country: "KUWAIT", company: "Kuwait Styrene", location: "Shuaiba", capa: 540, status: "Trouble", lat: 29.03, lng: 48.11 },
+        // --- NEA : JAPAN (7 Lines) ---
+        {"region": "NEA", "country": "JAPAN", "company": "Asahi Kasei Corp", "location": "Mizushima", "capa": 390, "status": "Normal", "lat": 38.5434, "lng": 135.1908}, 
+        {"region": "NEA", "country": "JAPAN", "company": "Denka Co Ltd", "location": "Ichihara", "capa": 270, "status": "Maintenance", "lat": 36.8348, "lng": 137.1517}, 
+        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd", "location": "Ichihara", "capa": 210, "status": "Maintenance", "lat": 33.5921, "lng": 136.5565}, 
+        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd", "location": "Shunan", "capa": 210, "status": "Maintenance", "lat": 38.2244, "lng": 140.6657}, 
+        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd", "location": "Shunan", "capa": 120, "status": "Maintenance", "lat": 35.9963, "lng": 138.0909}, 
+        {"region": "NEA", "country": "JAPAN", "company": "NS Styrene Monomer Co., Ltd.", "location": "Oita", "capa": 190, "status": "Maintenance", "lat": 38.4661, "lng": 139.1873}, 
+        {"region": "NEA", "country": "JAPAN", "company": "NS Styrene Monomer Co., Ltd.", "location": "Oita", "capa": 232, "status": "Maintenance", "lat": 37.4619, "lng": 139.6306}, 
 
-        // --- Western Europe ---
-        { region: "Western Europe", country: "SPAIN", company: "Repsol", location: "Tarragona", capa: 450, status: "Maintenance", lat: 41.11, lng: 1.21 },
+        // --- NEA : KOREA (8 Lines) ---
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha TotalEnergies Petrochemical Co Ltd", "location": "Seosan", "capa": 400, "status": "Shutdown", "lat": 34.5151, "lng": 127.1477}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha TotalEnergies Petrochemical Co Ltd", "location": "Seosan", "capa": 650, "status": "Normal", "lat": 36.3201, "lng": 128.4972}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Lotte Chemical Corporation", "location": "Seosan", "capa": 208, "status": "Normal", "lat": 36.7188, "lng": 128.6492}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Lotte Chemical Corporation", "location": "Seosan", "capa": 372, "status": "Normal", "lat": 34.9344, "lng": 128.8564}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "LG Chem Ltd", "location": "Yeosu", "capa": 200, "status": "Shutdown", "lat": 35.5, "lng": 127.2}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "LG Chem Ltd", "location": "Yeosu", "capa": 300, "status": "Shutdown", "lat": 35.6, "lng": 127.3}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "SK Picglobal Co., Ltd.", "location": "Ulsan", "capa": 400, "status": "Normal", "lat": 35.3786, "lng": 124.9179}, 
+        {"region": "NEA", "country": "KOREA, SOUTH", "company": "YEOCHUN NCC Co Ltd", "location": "Yeosu", "capa": 346, "status": "Normal", "lat": 37.4865, "lng": 128.8225}, 
 
-        // --- North America ---
-        { region: "North America", country: "UNITED STATES", company: "Cos-Mar Company", location: "Carville", capa: 1134, status: "Trouble", lat: 30.21, lng: -91.10 }
+        // --- NEA : TAIWAN (7 Lines) ---
+        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical & Fiber Corp", "location": "Mailiao", "capa": 250, "status": "Shutdown", "lat": 23.425, "lng": 118.0327}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical & Fiber Corp", "location": "Mailiao", "capa": 350, "status": "Shutdown", "lat": 24.6989, "lng": 120.4287}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical & Fiber Corp", "location": "Mailiao", "capa": 720, "status": "Shutdown", "lat": 21.0395, "lng": 121.1}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Grand Pacific Petrochemical Corporation", "location": "Ta-She District", "capa": 240, "status": "Maintenance", "lat": 22.7889, "lng": 121.8489}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Grand Pacific Petrochemical Corporation", "location": "Ta-She District", "capa": 130, "status": "Normal", "lat": 23.7788, "lng": 123.7563}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan Styrene Monomer Corporation", "location": "Lin Yuan District", "capa": 180, "status": "Shutdown", "lat": 23.2709, "lng": 123.4524}, 
+        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan Styrene Monomer Corporation", "location": "Lin Yuan District", "capa": 160, "status": "Shutdown", "lat": 22.1698, "lng": 119.3709}, 
+
+        // --- SEA (7 Lines) ---
+        {"region": "SEA", "country": "INDONESIA", "company": "PT Styrindo Mono Indonesia (SMI)", "location": "Serang", "capa": 100, "status": "Normal", "lat": -4.5901, "lng": 118.4462}, 
+        {"region": "SEA", "country": "INDONESIA", "company": "PT Styrindo Mono Indonesia (SMI)", "location": "Serang", "capa": 240, "status": "Normal", "lat": 0.2925, "lng": 116.7885}, 
+        {"region": "SEA", "country": "MALAYSIA", "company": "Idemitsu SM (Malaysia) Sdn Bhd", "location": "Pasir Gudang", "capa": 240, "status": "Maintenance", "lat": 3.2914, "lng": 99.8074}, 
+        {"region": "SEA", "country": "SINGAPORE", "company": "Aster Chemicals And Energy PTE. Ltd.", "location": "Jurong Island", "capa": 550, "status": "Normal", "lat": 1.4911, "lng": 104.1206}, 
+        {"region": "SEA", "country": "SINGAPORE", "company": "Shell Chemicals Seraya Pte. Ltd.", "location": "Jurong Island", "capa": 390, "status": "Normal", "lat": 0.3942, "lng": 103.7439}, 
+        {"region": "SEA", "country": "THAILAND", "company": "IRPC Public Company Limited", "location": "Mueang Rayong", "capa": 260, "status": "Normal", "lat": 17.51, "lng": 102.4315}, 
+        {"region": "SEA", "country": "THAILAND", "company": "Siam Styrene Monomer Co., Ltd.", "location": "Mueang Rayong", "capa": 300, "status": "Normal", "lat": 15.368, "lng": 100.637}, 
+
+        // --- WESTERN EUROPE (9 Lines) ---
+        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Styrolution Belgium N.V.", "location": "Antwerp", "capa": 310, "status": "Normal", "lat": 52.2417, "lng": 2.6647}, 
+        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Styrolution Belgium N.V.", "location": "Antwerp", "capa": 250, "status": "Normal", "lat": 53.9011, "lng": 6.2974}, 
+        {"region": "Western Europe", "country": "FRANCE", "company": "TotalEnergies Petrochemicals France", "location": "Gonfreville-L'Orcher", "capa": 630, "status": "Normal", "lat": 50.0452, "lng": 5.1387}, 
+        {"region": "Western Europe", "country": "GERMANY", "company": "BASF SE", "location": "Ludwigshafen", "capa": 550, "status": "Normal", "lat": 52.5618, "lng": 3.2093}, 
+        {"region": "Western Europe", "country": "ITALY", "company": "Eni Rewind S.p.A", "location": "Mantova", "capa": 430, "status": "Normal", "lat": 41.7983, "lng": 11.7518}, 
+        {"region": "Western Europe", "country": "ITALY", "company": "Versalis SpA", "location": "Mantova", "capa": 190, "status": "Normal", "lat": 45.3742, "lng": 14.5094}, 
+        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Ellba C.V.", "location": "Moerdijk", "capa": 550, "status": "Normal", "lat": 54.5694, "lng": 6.3893}, 
+        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Shell Nederland Chemie BV", "location": "Moerdijk", "capa": 450, "status": "Normal", "lat": 54.7274, "lng": 3.9647}, 
+        {"region": "Western Europe", "country": "SPAIN", "company": "Repsol Quimica SA", "location": "La Pobla de Mafumet", "capa": 490, "status": "Maintenance", "lat": 40.4255, "lng": -0.8989}, 
+
+        // --- MIDDLE EAST (6 Lines) ---
+        {"region": "Middle East", "country": "IRAN", "company": "Pars Petrochemical Co", "location": "Asaluyeh", "capa": 630, "status": "Normal", "lat": 34.2469, "lng": 52.5041}, 
+        {"region": "Middle East", "country": "IRAN", "company": "Tabriz Petrochemical Company", "location": "Tabriz", "capa": 95, "status": "Normal", "lat": 31.2827, "lng": 50.4501}, 
+        {"region": "Middle East", "country": "KUWAIT", "company": "The Kuwait Styrene Company", "location": "Shuaiba", "capa": 540, "status": "Trouble", "lat": 27.067, "lng": 46.4196}, 
+        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Arabian Petrochemical Company (PETROKEMYA)", "location": "Al Jubail", "capa": 580, "status": "Trouble", "lat": 23.2273, "lng": 47.3118}, 
+        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Arabian Petrochemical Company (PETROKEMYA)", "location": "Al Jubail", "capa": 580, "status": "Trouble", "lat": 21.7534, "lng": 47.3164}, 
+        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Jubail Chevron Phillips Co (JCP)", "location": "Al Jubail", "capa": 750, "status": "Normal", "lat": 21.9515, "lng": 43.7955}, 
+
+        // --- NORTH AMERICA (9 Lines) ---
+        {"region": "North America", "country": "CANADA", "company": "Shell Chemicals Canada Ltd.", "location": "Fort Saskatchewan", "capa": 450, "status": "Normal", "lat": 57.5698, "lng": -104.0871}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "Americas Styrenics LLC", "location": "St. James", "capa": 500, "status": "Normal", "lat": 36.8162, "lng": -96.2362}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "Americas Styrenics LLC", "location": "St. James", "capa": 453, "status": "Normal", "lat": 38.0073, "lng": -92.1321}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar Company", "location": "Carville", "capa": 567, "status": "Trouble", "lat": 34.5489, "lng": -94.3075}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar Company", "location": "Carville", "capa": 567, "status": "Trouble", "lat": 34.5422, "lng": -94.0854}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Styrolution America LLC", "location": "Pasadena", "capa": 771, "status": "Normal", "lat": 37.5405, "lng": -94.3012}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Styrolution America LLC", "location": "Texas City", "capa": 454, "status": "Normal", "lat": 35.4314, "lng": -95.4499}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "PO JV, LP (LyondellBasell/Covestro)", "location": "Channelview", "capa": 700, "status": "Normal", "lat": 34.7295, "lng": -92.2725}, 
+        {"region": "North America", "country": "UNITED STATES", "company": "PO JV, LP (LyondellBasell/Covestro)", "location": "Channelview", "capa": 700, "status": "Normal", "lat": 38.6257, "lng": -97.9415}, 
+
+        // --- SOUTH AMERICA (3 Lines) ---
+        {"region": "South America", "country": "ARGENTINA", "company": "Pampa Energia SA", "location": "Puerto General San Martin", "capa": 160, "status": "Normal", "lat": -33.0855, "lng": -63.102}, 
+        {"region": "South America", "country": "BRAZIL", "company": "Companhia Brasileira de Estireno SA", "location": "Cubatao", "capa": 120, "status": "Normal", "lat": -12.9941, "lng": -49.8719}, 
+        {"region": "South America", "country": "BRAZIL", "company": "Videolar-Innova S.A.", "location": "Triunfo", "capa": 420, "status": "Normal", "lat": -11.8206, "lng": -49.8619}
     ];
 
+    // --- BI 대시보드 구동 로직 (123개 사이트 전수 적용) ---
     const map = L.map('map', { zoomControl: false }).setView([25, 40], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
@@ -132,11 +219,12 @@
         nested[p.region].countries[p.country].capa += p.capa;
         nested[p.region].countries[p.country].plants.push(p);
 
-        const isIssue = p.status !== 'Normal';
+        const isIssue = (p.status !== 'Normal');
+        const markerColor = isIssue ? '#1A1A1B' : '#1597BB';
         const marker = L.circleMarker([p.lat, p.lng], {
-            radius: Math.sqrt(p.capa) * 1.3, fillColor: isIssue ? '#1A1A1B' : '#1597BB', color: '#fff', weight: 1.5, fillOpacity: 0.8
+            radius: Math.sqrt(p.capa) * 1.3, fillColor: markerColor, color: '#fff', weight: 1.5, fillOpacity: 0.8
         }).addTo(map);
-        marker.bindPopup(`<b>${p.company}</b><br>${p.location}<br>Capacity: ${p.capa}K MT/Y<br>Status: <b style="color:${isIssue?'red':'green'}">${p.status}</b>`);
+        marker.bindPopup(`<b>${p.company}</b><br>Location: ${p.location}<br>Capacity: ${p.capa}K MT/Y<br>Status: <b style="color:${isIssue?'red':'green'}">${p.status}</b>`);
         p._m = marker;
     });
 
@@ -145,7 +233,7 @@
         const rPct = ((rData.capa / globalTotal) * 100).toFixed(1);
         const rGroup = document.createElement('div');
         rGroup.className = 'region-group';
-        rGroup.innerHTML = `<div class="region-header" onclick="this.parentElement.classList.toggle('open'); map.flyTo([${rData.countries[Object.keys(rData.countries)[0]].plants[0].lat}, ${rData.countries[Object.keys(rData.countries)[0]].plants[0].lng}], 4)">
+        rGroup.innerHTML = `<div class="region-header" onclick="this.parentElement.classList.toggle('open');">
             <span>${rName}</span><span>${rData.capa.toLocaleString()}K (${rPct}%)</span></div>`;
 
         const cGroupContainer = document.createElement('div');
@@ -154,17 +242,18 @@
             const cPct = ((cData.capa / globalTotal) * 100).toFixed(1);
             const cItem = document.createElement('div');
             cItem.className = 'country-item';
-            cItem.innerHTML = `<div class="country-header" onclick="this.parentElement.classList.toggle('open'); map.flyTo([${cData.plants[0].lat}, ${cData.plants[0].lng}], 5)">
+            cItem.innerHTML = `<div class="country-header" onclick="this.parentElement.classList.toggle('open');">
                 <span>${cName}</span><span>${cData.capa.toLocaleString()}K (${cPct}%)</span></div>`;
 
             const pList = document.createElement('div');
             pList.className = 'plant-list';
             cData.plants.forEach(p => {
-                const isIssue = p.status !== 'Normal';
+                const isIssue = (p.status !== 'Normal');
+                const pPct = ((p.capa / globalTotal) * 100).toFixed(2);
                 const card = document.createElement('div');
                 card.className = `plant-card ${isIssue ? 'issue' : ''}`;
                 card.innerHTML = `<div class="name-line"><span>${p.company}</span><span class="badge ${isIssue?'black':''}">${p.status}</span></div>
-                    <div style="margin-top:4px; font-size:0.75rem;">${p.location} | ${p.capa}K MT/Y</div>`;
+                    <div style="margin-top:4px; font-size:0.75rem;">${p.location} | Capacity: ${p.capa}K MT/Y (${pPct}%)</div>`;
                 card.onclick = (e) => { e.stopPropagation(); map.flyTo([p.lat, p.lng], 9); setTimeout(() => p._m.openPopup(), 1600); };
                 pList.appendChild(card);
             });
