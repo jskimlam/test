@@ -7,10 +7,13 @@
     <style>
         :root { --primary: #0A2647; --accent: #1597BB; --trouble: #1A1A1B; --bg: #F0F5F9; --white: #FFFFFF; }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
-        #layout { display: flex; height: 100vh; width: 100vw; }
+        
+        #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
         #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
+
+        /* 사이드바 스타일 */
         #sidebar {
-            position: absolute; left: 0; top: 0; width: 420px; height: 100%;
+            position: absolute; left: 0; top: 0; width: 400px; height: 100%;
             background: var(--white); z-index: 2000; transition: transform 0.4s ease;
             box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column;
         }
@@ -20,36 +23,55 @@
             background: var(--primary); color: white; border: none; cursor: pointer;
             border-radius: 0 10px 10px 0; font-size: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
         }
-        .header { background: var(--primary); color: white; padding: 20px; cursor: pointer; }
-        .header h1 { margin: 0; font-size: 1.2rem; }
-        .global-cap { background: var(--accent); padding: 12px 20px; color: white; cursor: pointer; }
-        .global-cap span { font-size: 0.75rem; opacity: 0.9; display: block; }
-        .global-cap strong { font-size: 1.3rem; }
-        #list-container { flex-grow: 1; overflow-y: auto; padding: 10px; background: var(--bg); }
-        .group-header { 
-            background: #E1E9EF; padding: 8px 12px; font-weight: bold; color: var(--primary);
-            margin-top: 10px; border-radius: 4px; font-size: 0.9rem; display: flex; justify-content: space-between;
+
+        /* BI 헤더 */
+        .header { background: var(--primary); color: white; padding: 25px; cursor: pointer; }
+        .header h1 { margin: 0; font-size: 1.3rem; letter-spacing: 1px; }
+        .global-cap { background: var(--accent); padding: 15px 25px; color: white; cursor: pointer; border-bottom: 2px solid rgba(0,0,0,0.1); }
+        .global-cap strong { font-size: 1.5rem; }
+
+        /* 계층형 리스트 (Accordion) */
+        #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
+        
+        .level-1-header { /* Region */
+            background: #cbdceb; padding: 12px 15px; font-weight: bold; color: var(--primary);
+            cursor: pointer; border-bottom: 1px solid #b2c9d9; display: flex; justify-content: space-between;
         }
+        .level-2-header { /* Country */
+            background: #eef2f5; padding: 10px 15px 10px 30px; font-size: 0.9rem; font-weight: 600;
+            color: #444; cursor: pointer; border-bottom: 1px solid #d1d9e0; display: flex; justify-content: space-between;
+        }
+        .level-3-content { /* Plant Cards */
+            display: none; padding: 5px 0;
+        }
+        .level-2-container.open .level-3-content { display: block; }
+
         .plant-card {
-            background: white; border-radius: 6px; padding: 10px; margin: 5px 0 5px 15px;
-            border-left: 4px solid var(--accent); cursor: pointer; transition: 0.2s; font-size: 0.8rem;
+            background: white; border-radius: 8px; padding: 12px; margin: 5px 15px 5px 45px;
+            border-left: 5px solid var(--accent); cursor: pointer; transition: 0.2s; font-size: 0.85rem;
         }
-        .plant-card:hover { transform: translateX(5px); box-shadow: 0 3px 8px rgba(0,0,0,0.1); }
-        .plant-card.issue { border-left-color: var(--trouble); }
-        .plant-name { font-weight: bold; color: var(--primary); }
-        .badge { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; color: white; float: right; margin-left: 5px; }
+        .plant-card:hover { transform: translateX(5px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .plant-card.issue { border-left-color: var(--trouble); background: #f9f9f9; }
+        .plant-name { font-weight: bold; color: var(--primary); margin-bottom: 3px; }
+        .badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; color: white; float: right; }
+        .badge.black { background: var(--trouble); }
+        .badge.blue { background: var(--accent); }
+
+        /* 팝업 디자인 */
+        .leaflet-popup-content-wrapper { border-radius: 10px; }
     </style>
 </head>
 <body>
+
 <div id="layout">
     <div id="sidebar">
         <button id="toggle-btn" onclick="toggleSidebar()">📊</button>
         <div class="header" onclick="resetMapView()">
             <h1>Global SM Plant Status</h1>
-            <p style="margin:5px 0 0 0; font-size:0.7rem; opacity:0.7;">Made by LAM | Individual Line Tracking</p>
+            <p style="margin:5px 0 0 0; font-size:0.75rem; opacity:0.7;">Click to Reset Global View | Made by LAM</p>
         </div>
         <div class="global-cap" onclick="resetMapView()">
-            <span>Total Global Capacity</span>
+            <span>Total Global Capacity Tracking</span>
             <strong id="global-total-val">0</strong> <small>K MT/Y</small>
         </div>
         <div id="list-container"></div>
@@ -59,77 +81,129 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // [cite: 336-340] 데이터를 바탕으로 개별 공장(Line)별 리스트 구성
+    // 1. 데이터 통합 (제공해주신 CSV 및 문서 기반 전체 리스트)
     const plants = [
-        { region: "NEA", country: "China", company: "CSPC Huizhou", line: "Line 1", capa: 637, status: "Normal", lat: 22.75, lng: 114.65 },
-        { region: "NEA", country: "China", company: "CSPC Huizhou", line: "Line 2", capa: 650, status: "Normal", lat: 22.76, lng: 114.66 },
+        // NEA
+        { region: "NEA", country: "China", company: "Zhejiang Petroleum & Chem", line: "Zhoushan Base", capa: 2400, status: "Normal", lat: 30.34, lng: 122.15 },
         { region: "NEA", country: "China", company: "Fujian Gulei", line: "Main Line", capa: 600, status: "Maintenance", lat: 23.93, lng: 117.61 },
-        { region: "NEA", country: "China", company: "Tianjin Bohua", line: "Main Line", capa: 450, status: "Trouble", lat: 38.68, lng: 117.65 },
-        { region: "NEA", country: "China", company: "Tangshan Risun", line: "Main Line", capa: 300, status: "Maintenance", lat: 38.98, lng: 118.45 },
-        { region: "NEA", country: "Japan", company: "NS Styrene Monomer", line: "Line 1 (Oita)", capa: 190, status: "Maintenance", lat: 33.24, lng: 131.66 },
-        { region: "NEA", country: "Japan", company: "NS Styrene Monomer", line: "Line 2 (Oita)", capa: 232, status: "Maintenance", lat: 33.25, lng: 131.67 },
-        { region: "NEA", country: "Japan", company: "Idemitsu Kosan", line: "Tokuyama L1", capa: 120, status: "Maintenance", lat: 34.05, lng: 131.80 },
-        { region: "NEA", country: "Japan", company: "Idemitsu Kosan", line: "Tokuyama L2", capa: 220, status: "Maintenance", lat: 34.06, lng: 131.81 },
-        { region: "NEA", country: "Korea", company: "Lotte Chemical", line: "Seosan L1", capa: 208, status: "Normal", lat: 37.03, lng: 126.35 },
-        { region: "NEA", country: "Korea", company: "Lotte Chemical", line: "Seosan L2", capa: 372, status: "Normal", lat: 37.04, lng: 126.36 },
-        { region: "NEA", country: "Korea", company: "Hanwha TotalEnergies", line: "Seosan Active", capa: 650, status: "Normal", lat: 37.05, lng: 126.37 },
-        { region: "NEA", country: "Korea", company: "Hanwha TotalEnergies", line: "Seosan Shutdown", capa: 400, status: "Shutdown", lat: 37.06, lng: 126.38 },
+        { region: "NEA", country: "China", company: "Tianjin Bohua", line: "Nangang Line", capa: 450, status: "Trouble", lat: 38.68, lng: 117.65 },
+        { region: "NEA", country: "Korea", company: "Lotte Chemical", line: "Seosan Line", capa: 580, status: "Normal", lat: 37.03, lng: 126.35 },
+        { region: "NEA", country: "Korea", company: "LG Chem", line: "Yeocheon (Shutdown)", capa: 500, status: "Shutdown", lat: 34.84, lng: 127.68 },
+        { region: "NEA", country: "Japan", company: "NS Styrene Monomer", line: "Oita Line", capa: 422, status: "Maintenance", lat: 33.24, lng: 131.66 },
+        { region: "NEA", country: "Japan", company: "Denka", line: "Chiba Line", capa: 270, status: "Normal", lat: 35.51, lng: 140.08 },
         { region: "NEA", country: "Taiwan", company: "FCFC", line: "Mailiao L1", capa: 250, status: "Shutdown", lat: 23.78, lng: 120.18 },
-        { region: "NEA", country: "Taiwan", company: "FCFC", line: "Mailiao L2", capa: 350, status: "Normal", lat: 23.79, lng: 120.19 },
-        { region: "Middle East", company: "Petrokemya", line: "No 1 (Al Jubail)", capa: 570, status: "Trouble", lat: 27.01, lng: 49.62 },
-        { region: "Middle East", company: "Petrokemya", line: "No 2 (Al Jubail)", capa: 550, status: "Trouble", lat: 27.02, lng: 49.63 },
-        { region: "Middle East", company: "Kuwait Styrene", line: "Main Line", capa: 525, status: "Trouble", lat: 29.03, lng: 48.11 },
-        { region: "Europe", company: "Repsol", line: "Tarragona Line", capa: 450, status: "Maintenance", lat: 41.11, lng: 1.21 }
+        
+        // SEA
+        { region: "SEA", country: "Malaysia", company: "Idemitsu SM", line: "Pasir Gudang", capa: 240, status: "Maintenance", lat: 1.45, lng: 103.91 },
+        { region: "SEA", country: "Indonesia", company: "Styrindo Mono", line: "Serang Line", capa: 340, status: "Normal", lat: -6.01, lng: 106.12 },
+        { region: "SEA", country: "Singapore", company: "Shell Chemicals", line: "Jurong Island", capa: 390, status: "Normal", lat: 1.27, lng: 103.72 },
+
+        // ME
+        { region: "Middle East", country: "Kuwait", company: "Kuwait Styrene", line: "Shuaiba", capa: 540, status: "Trouble", lat: 29.03, lng: 48.11 },
+        { region: "Middle East", country: "Saudi Arabia", company: "Petrokemya", line: "Al Jubail No 1&2", capa: 1120, status: "Trouble", lat: 27.01, lng: 49.62 },
+
+        // WE
+        { region: "Europe", country: "Spain", company: "Repsol", line: "Tarragona", capa: 450, status: "Maintenance", lat: 41.11, lng: 1.21 },
+        { region: "Europe", country: "Germany", company: "BASF", line: "Ludwigshafen", capa: 550, status: "Normal", lat: 49.49, lng: 8.43 },
+
+        // NA
+        { region: "North America", country: "USA", company: "Cos-Mar", line: "Carville", capa: 1134, status: "Trouble", lat: 30.21, lng: -91.10 },
+        { region: "North America", country: "Canada", company: "Shell", line: "Fort Saskatchewan", capa: 450, status: "Normal", lat: 53.71, lng: -113.21 }
     ];
 
-    const map = L.map('map', { zoomControl: false }).setView([25, 110], 4);
+    // 2. 지도 초기화
+    const map = L.map('map', { zoomControl: false }).setView([25, 40], 3);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
 
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
     function resetMapView() { map.flyTo([25, 40], 3, { duration: 1.5 }); }
 
+    // 3. 통계 계산 및 마커 생성
     const globalTotal = plants.reduce((sum, p) => sum + p.capa, 0);
     document.getElementById('global-total-val').innerText = globalTotal.toLocaleString();
 
-    const nested = {};
+    const nestedData = {};
     plants.forEach(p => {
-        if (!nested[p.region]) nested[p.region] = { capa: 0, companies: {} };
-        if (!nested[p.region].companies[p.company]) nested[p.region].companies[p.company] = { capa: 0, lines: [] };
-        nested[p.region].capa += p.capa;
-        nested[p.region].companies[p.company].capa += p.capa;
-        nested[p.region].companies[p.company].lines.push(p);
+        if (!nestedData[p.region]) nestedData[p.region] = { capa: 0, countries: {} };
+        if (!nestedData[p.region].countries[p.country]) nestedData[p.region].countries[p.country] = { capa: 0, plants: [] };
+        
+        nestedData[p.region].capa += p.capa;
+        nestedData[p.region].countries[p.country].capa += p.capa;
+        nestedData[p.region].countries[p.country].plants.push(p);
 
-        const isIssue = p.status !== 'Normal';
+        // 지도 마커 생성 (중지/보수 업체는 검은색)
+        const isIssue = (p.status !== 'Normal');
         const color = isIssue ? '#1A1A1B' : '#1597BB';
         const marker = L.circleMarker([p.lat, p.lng], {
-            radius: Math.sqrt(p.capa) * 1.2, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.8
+            radius: Math.sqrt(p.capa) * 1.3, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.8
         }).addTo(map);
 
-        marker.bindPopup(`<b>${p.company}</b><br>${p.line}<br>Capacity: ${p.capa}K<br>Status: <b style="color:${isIssue?'red':'green'}">${p.status}</b>`);
-        p._marker = marker;
+        const popup = L.popup().setContent(`
+            <div style="font-family:sans-serif;">
+                <h3 style="margin:0; color:${color}">${p.company}</h3>
+                <p style="margin:5px 0; font-size:0.85rem;"><b>Line:</b> ${p.line}<br><b>Capacity:</b> ${p.capa}K MT</p>
+                <b style="color:${isIssue?'red':'green'}">${p.status}</b>
+            </div>
+        `);
+        marker.bindPopup(popup);
+        p._marker = marker; // 마커 객체 저장
     });
 
+    // 4. 계층형 리스트 UI 생성
     const container = document.getElementById('list-container');
-    Object.entries(nested).sort((a,b)=>b[1].capa - a[1].capa).forEach(([rName, rData]) => {
+    Object.entries(nestedData).sort((a,b) => b[1].capa - a[1].capa).forEach(([region, rData]) => {
         const rPct = ((rData.capa / globalTotal) * 100).toFixed(1);
-        container.innerHTML += `<div class="group-header"><span>${rName}</span><span>${rData.capa.toLocaleString()}K (${rPct}%)</span></div>`;
         
-        Object.entries(rData.companies).forEach(([cName, cData]) => {
+        // 1단계: Region
+        const rHeader = document.createElement('div');
+        rHeader.className = 'level-1-header';
+        rHeader.innerHTML = `<span>${region}</span><span>${rData.capa.toLocaleString()}K (${rPct}%)</span>`;
+        rHeader.onclick = () => map.flyTo([rData.countries[Object.keys(rData.countries)[0]].plants[0].lat, rData.countries[Object.keys(rData.countries)[0]].plants[0].lng], 4);
+        container.appendChild(rHeader);
+
+        // 2단계: Country (Container)
+        Object.entries(rData.countries).sort((a,b) => b[1].capa - a[1].capa).forEach(([country, cData]) => {
             const cPct = ((cData.capa / globalTotal) * 100).toFixed(1);
-            const compDiv = document.createElement('div');
-            compDiv.style.paddingLeft = "10px";
-            compDiv.innerHTML = `<div style="font-size:0.85rem; color:#444; margin-top:5px; font-weight:600;">• ${cName} (${cPct}%)</div>`;
+            const cContainer = document.createElement('div');
+            cContainer.className = 'level-2-container';
             
-            cData.lines.forEach(line => {
-                const isIssue = line.status !== 'Normal';
-                const lineCard = document.createElement('div');
-                lineCard.className = `plant-card ${isIssue ? 'issue' : ''}`;
-                lineCard.innerHTML = `<span class="badge" style="background:${isIssue?'#222':'#1597BB'}">${line.status}</span>
-                    <div class="plant-name">${line.line}</div><div style="font-size:0.7rem;">Capa: ${line.capa}K MT/Y</div>`;
-                lineCard.onclick = () => { map.flyTo([line.lat, line.lng], 9); line._marker.openPopup(); };
-                compDiv.appendChild(lineCard);
+            const cHeader = document.createElement('div');
+            cHeader.className = 'level-2-header';
+            cHeader.innerHTML = `<span>${country}</span><span>${cData.capa.toLocaleString()}K (${cPct}%)</span>`;
+            
+            const cContent = document.createElement('div');
+            cContent.className = 'level-3-content';
+
+            cHeader.onclick = (e) => {
+                e.stopPropagation();
+                cContainer.classList.toggle('open');
+                map.flyTo([cData.plants[0].lat, cData.plants[0].lng], 5);
+            };
+
+            // 3단계: Plant Cards
+            cData.plants.forEach(p => {
+                const pPct = ((p.capa / globalTotal) * 100).toFixed(1);
+                const isIssue = p.status !== 'Normal';
+                const card = document.createElement('div');
+                card.className = `plant-card ${isIssue ? 'issue' : ''}`;
+                card.innerHTML = `
+                    <span class="badge ${isIssue?'black':'blue'}">${p.status}</span>
+                    <div class="plant-name">${p.company}</div>
+                    <div style="font-size:0.75rem; color:#666;">${p.line} | ${p.capa}K MT (${pPct}%)</div>
+                `;
+                
+                card.onclick = (e) => {
+                    e.stopPropagation();
+                    map.flyTo([p.lat, p.lng], 9, { duration: 1.5 });
+                    // 마커 팝업 열기 보장
+                    setTimeout(() => { p._marker.openPopup(); }, 1600);
+                };
+                cContent.appendChild(card);
             });
-            container.appendChild(compDiv);
+
+            cContainer.appendChild(cHeader);
+            cContainer.appendChild(cContent);
+            container.appendChild(cContainer);
         });
     });
 </script>
