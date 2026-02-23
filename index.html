@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global Supply Control Tower | JS KIM (v13.8)</title>
+    <title>Global Supply Control Tower | JS KIM (v13.9-GAS)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
@@ -181,10 +181,14 @@
     }
 
     function getLossDays(startStr, endStr, mode, isCurrent = false) {
-        if (!startStr || startStr === "") return 0;
+        // GAS JSON에서 온 값은 타입이 다를 수 있으므로 강제 문자열 변환
+        if (startStr === null || startStr === undefined) return 0;
+        const startStrSafe = String(startStr).trim();
+        const endStrSafe   = endStr !== null && endStr !== undefined ? String(endStr).trim() : "";
+        if (!startStrSafe || startStrSafe === "" || startStrSafe === "0") return 0;
        
-        const s = cleanDateStr(startStr);
-        let e = cleanDateStr(endStr);
+        const s = cleanDateStr(startStrSafe);
+        let e = cleanDateStr(endStrSafe);
 
         // 핵심: 종료일이 없는데 Current 리스크라면 이번 달 말일(2026-02-28)로 강제 설정
         if ((!e || e === "") && isCurrent) {
