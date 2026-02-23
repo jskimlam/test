@@ -2,248 +2,381 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Global SM Plant Status (Full 123 Lines) | Made by LAM</title>
+    <title>Global Supply Control Tower | JS KIM (v13.8)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <style>
-        :root { --primary: #0A2647; --accent: #1597BB; --trouble: #1A1A1B; --bg: #F0F5F9; --white: #FFFFFF; }
+        :root {
+            --primary: #0A2647;
+            --accent: #1597BB;
+            --current: #1A1A1B;
+            --future: #D35400;
+            --bg: #F0F5F9;
+        }
         body, html { margin: 0; padding: 0; height: 100%; font-family: 'Pretendard', sans-serif; overflow: hidden; }
         #layout { display: flex; height: 100vh; width: 100vw; position: relative; }
-        #map { flex-grow: 1; height: 100%; background: #DAEAF1; z-index: 1; }
-        #sidebar {
-            position: absolute; left: 0; top: 0; width: 450px; height: 100%;
-            background: var(--white); z-index: 2000; transition: transform 0.4s ease;
-            box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column;
-        }
+        #map { flex-grow: 1; height: 100%; background: #0b192e; z-index: 1; }
+        #sidebar { position: absolute; left: 0; top: 0; width: 320px; height: 100%; background: white; z-index: 2000; transition: transform 0.4s ease; box-shadow: 5px 0 15px rgba(0,0,0,0.1); display: flex; flex-direction: column; }
         #sidebar.hidden { transform: translateX(-100%); }
-        #toggle-btn {
-            position: absolute; right: -55px; top: 20px; width: 55px; height: 50px;
-            background: var(--primary); color: white; border: none; cursor: pointer;
-            border-radius: 0 10px 10px 0; font-size: 20px; box-shadow: 2px 0 10px rgba(0,0,0,0.1);
-        }
-        .header { background: var(--primary); color: white; padding: 25px; cursor: pointer; }
-        .global-cap { background: var(--accent); padding: 15px 25px; color: white; cursor: pointer; border-bottom: 2px solid rgba(0,0,0,0.1); }
-        .global-cap strong { font-size: 1.5rem; }
+        #toggle-btn { position: absolute; right: -45px; top: 20px; width: 45px; height: 45px; background: var(--primary); color: white; border: none; cursor: pointer; border-radius: 0 8px 8px 0; font-size: 18px; z-index: 2001; }
+        .header { background: var(--primary); color: white; padding: 25px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); position: relative; }
+        .created-by { font-size: 1.1rem; color: #FFD700; font-weight: 900; display: block; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; border-bottom: 1px solid rgba(255,215,0,0.3); padding-bottom: 5px; }
+        #data-mode { position: absolute; right: 20px; bottom: 20px; font-size: 0.65rem; font-weight: 900; padding: 4px 10px; border-radius: 12px; background: #95a5a6; color: white; cursor: pointer; z-index: 2002; }
+        .product-tabs { display: flex; background: #051937; padding: 5px; gap: 4px; }
+        .tab-btn { flex: 1; padding: 12px 2px; border: none; background: rgba(255,255,255,0.1); color: white; cursor: pointer; font-weight: bold; font-size: 0.75rem; border-radius: 4px; }
+        .tab-btn.active { background: var(--accent); color: white; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; background: var(--accent); color: white; gap: 1px; }
+        .metric-box { padding: 10px; background: var(--accent); text-align: center; }
+        .metric-value { font-size: 1.15rem; font-weight: 900; }
         #list-container { flex-grow: 1; overflow-y: auto; background: var(--bg); }
-        .region-header { background: #cbdceb; padding: 12px 15px; font-weight: bold; color: var(--primary); cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #b2c9d9; }
-        .country-group { display: none; background: #eef2f5; }
-        .region-group.open > .country-group { display: block; }
-        .country-header { padding: 10px 15px 10px 30px; font-size: 0.9rem; font-weight: 600; color: #444; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid #d1d9e0; }
-        .plant-list { display: none; padding: 5px 0; background: #fff; }
-        .country-item.open > .plant-list { display: block; }
-        .plant-card { padding: 10px 15px 10px 45px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; font-size: 0.8rem; }
-        .plant-card:hover { background: #f0f7ff; }
-        .plant-card.issue { border-left: 6px solid var(--trouble); background: #f9f9f9; }
-        .badge { font-size: 0.65rem; padding: 2px 5px; border-radius: 3px; color: white; background: var(--accent); float: right; margin-left: 5px; }
-        .badge.black { background: var(--trouble); }
+        .group-header { padding: 14px 12px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,0.05); font-size: 0.85rem; align-items: center; }
+        .region-header { background: #cbdceb; color: var(--primary); margin-top: 2px; }
+        .country-header { background: #e8eff5; font-size: 0.78rem; padding-left: 20px; border-left: 3px solid var(--accent); }
+        .header-stats { font-weight: 900; display: block; margin-top: 4px; font-size: 0.85rem; }
+        .collapsible-content { display: none; }
+        .open > .collapsible-content { display: block; }
+        .plant-card { padding: 12px 15px 12px 30px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 0.72rem; background: white; position: relative; }
+        .loss-badge { background: #E74C3C; color: white; font-weight: bold; padding: 2px 6px; border-radius: 10px; font-size: 0.6rem; position: absolute; right: 10px; top: 10px; }
+        #update-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 420px; background: white; z-index: 11000; padding: 25px; box-shadow: 0 0 60px rgba(0,0,0,0.6); border-radius: 20px; display: none; }
+        #update-modal textarea { width: 100%; height: 180px; margin: 10px 0; font-size: 0.75rem; border: 1px solid #ddd; border-radius: 5px; padding: 8px; box-sizing: border-box; }
+        #admin-password { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--primary); border-radius: 8px; box-sizing: border-box; font-weight: bold; font-size: 1rem; text-align: center; }
+        #data-input-section { display: none; border-top: 2px dashed #eee; padding-top: 15px; margin-top: 10px; }
+        #sync-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 38, 71, 0.97); z-index: 10000; display: none; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; }
+        .sync-spinner { width: 45px; height: 45px; border: 4px solid rgba(255,255,255,0.2); border-top: 4px solid #FFD700; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 20px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .history-container { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--accent); }
+        .history-title { font-size: 0.75rem; font-weight: 900; color: var(--accent); margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 0.68rem; text-align: left; }
+        .history-table th { color: #888; padding: 4px; border-bottom: 1px solid #eee; }
+        .history-table td { padding: 6px 4px; border-bottom: 1px solid #f9f9f9; }
+        .status-tag { padding: 2px 4px; border-radius: 4px; font-weight: bold; color: white; font-size: 0.6rem; }
+        .info-row { display: flex; flex-direction: column; margin-bottom: 8px; border-bottom: 1px solid #f0f0f0; padding-bottom: 4px; }
+        .info-label { font-size: 0.65rem; color: #888; font-weight: bold; text-transform: uppercase; }
+        .info-value { font-size: 0.9rem; color: #222; font-weight: 700; }
+        #chart-panel { position: fixed; bottom: 0; left: 0; width: 100%; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 20px rgba(0,0,0,0.2); z-index: 3000; padding: 20px; box-sizing: border-box; transition: transform 0.3s ease-in-out; transform: translateY(100%); max-height: 50vh; overflow: hidden; display: flex; flex-direction: column; }
+        #chart-panel.active { transform: translateY(0); }
+        .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .close-chart-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #999; }
+        .chart-container { flex-grow: 1; position: relative; }
     </style>
 </head>
 <body>
+
+<div id="update-modal">
+    <div id="auth-section">
+        <h3 style="margin-top:0; color:var(--primary);">🔒 JS KIM Security</h3>
+        <input type="password" id="admin-password" placeholder="Admin Password">
+        <button style="background:var(--primary); color:white; padding:12px; width:100%; border:none; border-radius:8px; cursor:pointer; font-weight:900;" onclick="verifyAdmin()">인증</button>
+    </div>
+    <div id="data-input-section">
+        <textarea id="csv-input" placeholder="CSV 데이터를 붙여넣으세요..."></textarea>
+        <div style="display: flex; gap: 10px;">
+            <button style="flex: 2; background:#27ae60; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="saveManualData()">저장</button>
+            <button style="flex: 1; background:#e67e22; color:white; padding:15px; border:none; border-radius:10px; cursor:pointer; font-weight:900;" onclick="clearManualData()">초기화</button>
+        </div>
+    </div>
+    <button style="width:100%; margin-top:15px; border:none; padding:10px; border-radius:8px; cursor:pointer;" onclick="closeModal()">닫기</button>
+</div>
+
+<div id="sync-overlay">
+    <div class="sync-spinner"></div>
+    <div id="sync-main-text" style="font-size: 1.8rem; font-weight: 900; margin-bottom: 12px;">동기화 시도 중...</div>
+    <div style="font-size: 1.1rem; color: #1597BB; font-weight: 500;">Attempting Online Sync...</div>
+    <div style="margin-top: 60px; color: #FFD700; font-weight: 900; font-size: 1.5rem;">CREATED BY JS KIM OF LAM</div>
+</div>
+
 <div id="layout">
     <div id="sidebar">
-        <button id="toggle-btn" onclick="toggleSidebar()">📊</button>
-        <div class="header" onclick="resetMapView()">
-            <h1 style="margin:0; font-size:1.1rem;">Global SM Plant Status (Full 123 Sites)</h1>
-            <p style="margin:5px 0 0 0; font-size:0.75rem; opacity:0.7;">No Summarization | Accurate Individual Tracking</p>
+        <button id="toggle-btn" onclick="document.getElementById('sidebar').classList.toggle('hidden')">☰</button>
+        <div class="product-tabs">
+            <button class="tab-btn active" id="btn-SM" onclick="switchProduct('SM')">SM</button>
+            <button class="tab-btn" id="btn-AN" onclick="switchProduct('AN')">AN</button>
+            <button class="tab-btn" id="btn-BD" onclick="switchProduct('BD')">BD</button>
         </div>
-        <div class="global-cap" onclick="resetMapView()">
-            <span style="font-size:0.75rem;">Total Global Capacity Tracking</span><br>
-            <strong id="global-val">0</strong> <small>K MT/Y</small>
+        <div class="header">
+            <span class="created-by">CREATED BY JS KIM OF LAM</span>
+            <h1 id="prod-title" onclick="resetToGlobal()" style="margin:0; font-size:1.1rem; cursor:pointer;">Global Supply Control Map</h1>
+            <span id="data-mode" onclick="showUpdateModal()">SYNC CHECK</span>
         </div>
-        <div id="list-container"></div>
+        <div class="metrics-grid">
+            <div class="metric-box"><span>GLOBAL CAPA</span><span class="metric-value" id="global-val">0</span></div>
+            <div class="metric-box"><span>TOTAL SITES</span><span class="metric-value" id="total-sites">0</span></div>
+            <div class="metric-box" style="background: #1A1A1B;"><span style="font-size:0.6rem; opacity:0.8; display:block;">CUR. LOSS %</span><span class="metric-value" id="cur-ratio" style="color:#FF4D4D">0.00%</span></div>
+            <div class="metric-box" style="background: #D35400;"><span style="font-size:0.6rem; opacity:0.8; display:block;">MONTH LOSS</span><span class="metric-value" id="cur-loss-mt" style="color:#FFD700">0K</span></div>
+        </div>
+        <div id="list-container">
+            <div id="current-risk-group" class="open"><div class="group-header" style="background:var(--current); color:white" onclick="this.parentElement.classList.toggle('open')"><span>⚠️ CURRENT RISK</span><span id="cur-sum-h"></span></div><div class="collapsible-content" id="current-risk-list"></div></div>
+            <div id="future-risk-group" class="open"><div class="group-header" style="background:var(--future); color:white" onclick="this.parentElement.classList.toggle('open')"><span>📅 FUTURE MAINT</span><span id="fut-sum-h"></span></div><div class="collapsible-content" id="future-risk-list"></div></div>
+            <div style="background: var(--primary); color:white; padding:10px 12px; font-size:0.75rem; font-weight:bold; margin-top:10px;">🌐 REGIONAL DIRECTORY</div>
+            <div id="region-list"></div>
+        </div>
     </div>
     <div id="map"></div>
 </div>
 
+<div id="chart-panel">
+    <div class="chart-header">
+        <span class="chart-title" id="chart-country-name">Country Capacity Share</span>
+        <button class="close-chart-btn" onclick="closeChartPanel()">×</button>
+    </div>
+    <div class="chart-container"><canvas id="country-chart"></canvas></div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-    // 6개 CSV 전수 조사 결과 (요약/생략 절대 없음, 123개 사이트 전체 개별 기입)
-    const plants = [
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Haoyuan Chemical Group Co., Ltd.", "location": "Fuyang", "capacity": 260, "status": "Normal", "lat": 32.89, "lng": 115.82}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Anhui Jiaxi New Material Technology Co., Ltd.", "location": "Huainan", "capacity": 350, "status": "Normal", "lat": 32.62, "lng": 116.99}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Bora LyondellBasell Petrochemical Co Ltd", "location": "Panjin", "capacity": 350, "status": "Normal", "lat": 41.12, "lng": 122.07}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "China Petroleum Engineering Co Ltd", "location": "Karamay", "capacity": 40, "status": "Normal", "lat": 45.59, "lng": 84.87}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC and Shell (CSPC) Line 1", "location": "Huizhou", "capacity": 637, "status": "Normal", "lat": 23.09, "lng": 114.41}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC and Shell (CSPC) Line 2", "location": "Huizhou", "capacity": 650, "status": "Normal", "lat": 23.09, "lng": 114.41}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNOOC Dongfang Petrochemical Co., Ltd.", "location": "Dongfang", "capacity": 120, "status": "Normal", "lat": 19.1, "lng": 108.65}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Cnooc Ningbo Daxie Petrochemical Co Ltd", "location": "Ningbo", "capacity": 280, "status": "Normal", "lat": 29.86, "lng": 121.54}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "CNPC/PDVSA Guangdong Petrochemical Co. Ltd.", "location": "Jieyang", "capacity": 800, "status": "Normal", "lat": 23.55, "lng": 116.36}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochemical Company L1", "location": "Daqing", "capacity": 100, "status": "Normal", "lat": 46.59, "lng": 125.12}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Daqing Petrochemical Company L2", "location": "Daqing", "capacity": 125, "status": "Normal", "lat": 46.59, "lng": 125.12}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Gulei Petrochemical Co Ltd", "location": "Zhangzhou", "capacity": 600, "status": "Maintenance", "lat": 24.51, "lng": 117.65}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Fujian Haiquan Chemical Co., Ltd", "location": "Zhangzhou", "capacity": 226, "status": "Normal", "lat": 24.51, "lng": 117.65}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guangdong Xinhuayue Petrochemical", "location": "Maoming", "capacity": 30, "status": "Normal", "lat": 21.66, "lng": 110.92}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Guoen Chemical (Dongming) Co., Ltd.", "location": "Dongming", "capacity": 150, "status": "Normal", "lat": 35.29, "lng": 115.09}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hengli Petrochemical (Dalian) Co., Ltd.", "location": "Dalian", "capacity": 720, "status": "Normal", "lat": 38.91, "lng": 121.61}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Hongrun Petrochemical (Weifang) Co Ltd", "location": "Weifang", "capacity": 120, "status": "Normal", "lat": 36.71, "lng": 119.1}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lanzhou Huifeng Petrochemical Co., Ltd.", "location": "Lanzhou", "capacity": 25, "status": "Normal", "lat": 36.06, "lng": 103.83}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin Refining L1", "location": "Dongying", "capacity": 80, "status": "Normal", "lat": 37.43, "lng": 118.49}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Lihuayi Lijin Refining L2", "location": "Dongying", "capacity": 720, "status": "Normal", "lat": 37.43, "lng": 118.49}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Technology Group L1", "location": "Changzhou", "capacity": 250, "status": "Normal", "lat": 31.78, "lng": 119.96}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "New Solar Technology Group L2", "location": "Changzhou", "capacity": 300, "status": "Normal", "lat": 31.78, "lng": 119.96}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Huatai Shengfu Polymeric", "location": "Ningbo", "capacity": 400, "status": "Normal", "lat": 29.86, "lng": 121.54}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo Keyuan Refining Co., Ltd.", "location": "Ningbo", "capacity": 80, "status": "Normal", "lat": 29.86, "lng": 121.54}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC Lyondell L1", "location": "Ningbo", "capacity": 620, "status": "Normal", "lat": 29.86, "lng": 121.54}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Ningbo ZRCC LyondellBasell L2", "location": "Ningbo", "capacity": 600, "status": "Normal", "lat": 29.86, "lng": 121.54}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Panjin Ethylene Co., Ltd.", "location": "Panjin", "capacity": 195, "status": "Normal", "lat": 41.12, "lng": 122.07}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Dushanzi Petrochemical", "location": "Karamay", "capacity": 360, "status": "Normal", "lat": 45.59, "lng": 84.87}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Fushun Petrochemical", "location": "Fushun", "capacity": 60, "status": "Normal", "lat": 41.88, "lng": 123.95}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi Petrochemical L1", "location": "Qinzhou", "capacity": 35, "status": "Normal", "lat": 21.95, "lng": 108.62}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Guangxi Petrochemical L2", "location": "Qinzhou", "capacity": 302, "status": "Normal", "lat": 21.95, "lng": 108.62}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Huabei Petrochemical", "location": "Renqiu", "capacity": 80, "status": "Normal", "lat": 38.7, "lng": 116.1}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin Petrochemical L1", "location": "Jilin City", "capacity": 600, "status": "Normal", "lat": 43.84, "lng": 126.55}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jilin Petrochemical L2", "location": "Jilin City", "capacity": 320, "status": "Normal", "lat": 43.84, "lng": 126.55}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinxi Petrochemical", "location": "Huludao", "capacity": 60, "status": "Normal", "lat": 40.71, "lng": 120.84}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Jinzhou Petrochemical", "location": "Jinzhou", "capacity": 80, "status": "Normal", "lat": 41.09, "lng": 121.12}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "PetroChina Lanzhou Petrochemical", "location": "Lanzhou", "capacity": 60, "status": "Normal", "lat": 36.06, "lng": 103.83}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Qingdao Haiwan Chemical Co., Ltd.", "location": "Qingdao", "capacity": 500, "status": "Normal", "lat": 36.07, "lng": 120.38}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Satellite Chemical Co., Ltd.", "location": "Lianyungang", "capacity": 600, "status": "Normal", "lat": 34.6, "lng": 119.22}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shaanxi Yanchang Petroleum Group", "location": "Yan'an", "capacity": 120, "status": "Normal", "lat": 36.59, "lng": 109.49}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Huaxing Petrochemical", "location": "Dongying", "capacity": 80, "status": "Normal", "lat": 37.43, "lng": 118.49}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shandong Yulong Petrochemical", "location": "Yantai", "capacity": 500, "status": "Normal", "lat": 37.54, "lng": 121.39}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shanghai SECCO Petrochemical", "location": "Jinshan", "capacity": 650, "status": "Normal", "lat": 30.73, "lng": 121.34}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shenghong Petrochemical Co Ltd", "location": "Lianyungang", "capacity": 450, "status": "Normal", "lat": 34.6, "lng": 119.22}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Shengteng Technology Co., Ltd.", "location": "Cangzhou", "capacity": 80, "status": "Normal", "lat": 38.3, "lng": 116.85}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinochem Quanzhou Petrochemical", "location": "Quanzhou", "capacity": 450, "status": "Normal", "lat": 24.87, "lng": 118.67}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing Company L1", "location": "Anqing", "capacity": 100, "status": "Normal", "lat": 30.51, "lng": 117.05}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Anqing Company L2", "location": "Anqing", "capacity": 400, "status": "Normal", "lat": 30.51, "lng": 117.05}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Baling Petrochemical Branch", "location": "Yueyang", "capacity": 120, "status": "Normal", "lat": 29.37, "lng": 113.13}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Guangzhou Co", "location": "Guangzhou", "capacity": 80, "status": "Normal", "lat": 23.13, "lng": 113.26}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Hainan Refining L1", "location": "Yangpu", "capacity": 500, "status": "Normal", "lat": 19.74, "lng": 109.18}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Hainan Refining L2", "location": "Yangpu", "capacity": 80, "status": "Normal", "lat": 19.74, "lng": 109.18}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jingmen Co", "location": "Jingmen", "capacity": 80, "status": "Normal", "lat": 31.03, "lng": 112.2}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Jinling Co", "location": "Nanjing", "capacity": 60, "status": "Normal", "lat": 32.04, "lng": 118.79}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Luoyang Co", "location": "Luoyang", "capacity": 120, "status": "Normal", "lat": 34.62, "lng": 112.45}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec Qingdao Refining", "location": "Qingdao", "capacity": 80, "status": "Normal", "lat": 36.07, "lng": 120.38}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Sinopec SABIC Tianjin", "location": "Tianjin", "capacity": 35, "status": "Normal", "lat": 39.12, "lng": 117.19}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "SP Chemicals (Taixing) Co., Ltd.", "location": "Taixing", "capacity": 320, "status": "Normal", "lat": 32.17, "lng": 119.96}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tangshan Risun Chemical Co Ltd", "location": "Tangshan", "capacity": 300, "status": "Maintenance", "lat": 39.63, "lng": 118.17}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Bohua Chemical", "location": "Binhai New Area", "capacity": 450, "status": "Trouble", "lat": 39.06, "lng": 117.69}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Tianjin Dagu Chemical Co Ltd", "location": "Binhai New Area", "capacity": 500, "status": "Normal", "lat": 39.06, "lng": 117.69}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Various_China Facilities", "location": "Nanjing", "capacity": 120, "status": "Normal", "lat": 32.04, "lng": 118.79}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical Group L1", "location": "Yantai", "capacity": 650, "status": "Normal", "lat": 37.54, "lng": 121.39}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Wanhua Chemical Group L2", "location": "Yantai", "capacity": 12, "status": "Normal", "lat": 37.54, "lng": 121.39}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum & Chem (ZPC) L1", "location": "Zhoushan", "capacity": 1200, "status": "Normal", "lat": 30.0, "lng": 122.1}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum & Chem (ZPC) L2", "location": "Zhoushan", "capacity": 600, "status": "Normal", "lat": 30.0, "lng": 122.1}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhejiang Petroleum & Chem (ZPC) L3", "location": "Zhoushan", "capacity": 600, "status": "Normal", "lat": 30.0, "lng": 122.1}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zhenhua Petrochemical Co., Ltd.", "location": "Dongying", "capacity": 503, "status": "Normal", "lat": 37.43, "lng": 118.49}, 
-        {"region": "NEA", "country": "CHINA (MAINLAND)", "company": "Zibo Juncheng Chemical Co., Ltd.", "location": "Zibo", "capacity": 500, "status": "Normal", "lat": 36.81, "lng": 118.06}, 
-        {"region": "NEA", "country": "JAPAN", "company": "Asahi Kasei Corp", "location": "Mizushima", "capacity": 390, "status": "Normal", "lat": 34.48, "lng": 133.72}, 
-        {"region": "NEA", "country": "JAPAN", "company": "Denka Co Ltd", "location": "Ichihara", "capacity": 270, "status": "Maintenance", "lat": 35.51, "lng": 140.09}, 
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd", "location": "Ichihara", "capacity": 210, "status": "Maintenance", "lat": 35.51, "lng": 140.09}, 
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd L1", "location": "Shunan", "capacity": 210, "status": "Maintenance", "lat": 34.05, "lng": 131.81}, 
-        {"region": "NEA", "country": "JAPAN", "company": "Idemitsu Kosan Co., Ltd L2", "location": "Shunan", "capacity": 120, "status": "Maintenance", "lat": 34.05, "lng": 131.81}, 
-        {"region": "NEA", "country": "JAPAN", "company": "NS Styrene Monomer L1", "location": "Oita", "capacity": 190, "status": "Maintenance", "lat": 33.24, "lng": 131.66}, 
-        {"region": "NEA", "country": "JAPAN", "company": "NS Styrene Monomer L2", "location": "Oita", "capacity": 232, "status": "Maintenance", "lat": 33.24, "lng": 131.66}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha Total (L1)", "location": "Seosan", "capacity": 650, "status": "Normal", "lat": 37.0, "lng": 126.35}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Hanwha Total (Shutdown Line)", "location": "Seosan", "capacity": 400, "status": "Shutdown", "lat": 37.0, "lng": 126.35}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Lotte Chemical L1", "location": "Seosan", "capacity": 208, "status": "Normal", "lat": 37.0, "lng": 126.35}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "Lotte Chemical L2", "location": "Seosan", "capacity": 372, "status": "Normal", "lat": 37.0, "lng": 126.35}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "SK Picglobal Co., Ltd.", "location": "Ulsan", "capacity": 400, "status": "Normal", "lat": 35.54, "lng": 129.31}, 
-        {"region": "NEA", "country": "KOREA, SOUTH", "company": "YEOCHUN NCC Co Ltd", "location": "Yeosu", "capacity": 346, "status": "Normal", "lat": 34.76, "lng": 127.66}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical (FCFC) L1", "location": "Mailiao", "capacity": 250, "status": "Shutdown", "lat": 23.79, "lng": 120.18}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical (FCFC) L2", "location": "Mailiao", "capacity": 350, "status": "Shutdown", "lat": 23.79, "lng": 120.18}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Formosa Chemical (FCFC) L3", "location": "Mailiao", "capacity": 720, "status": "Shutdown", "lat": 23.79, "lng": 120.18}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Grand Pacific (GPPC) L3", "location": "Ta-She District", "capacity": 240, "status": "Maintenance", "lat": 22.73, "lng": 120.36}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Grand Pacific (GPPC) L2", "location": "Ta-She District", "capacity": 130, "status": "Normal", "lat": 22.73, "lng": 120.36}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan SM Corp L1", "location": "Lin Yuan District", "capacity": 180, "status": "Shutdown", "lat": 22.48, "lng": 120.4}, 
-        {"region": "NEA", "country": "TAIWAN", "company": "Taiwan SM Corp L2", "location": "Lin Yuan District", "capacity": 160, "status": "Shutdown", "lat": 22.48, "lng": 120.4}, 
-        {"region": "SEA", "country": "INDONESIA", "company": "PT Styrindo Mono (SMI) L1", "location": "Serang", "capacity": 100, "status": "Normal", "lat": -6.11, "lng": 106.15}, 
-        {"region": "SEA", "country": "INDONESIA", "company": "PT Styrindo Mono (SMI) L2", "location": "Serang", "capacity": 240, "status": "Normal", "lat": -6.11, "lng": 106.15}, 
-        {"region": "SEA", "country": "MALAYSIA", "company": "Idemitsu SM (Malaysia)", "location": "Pasir Gudang", "capacity": 240, "status": "Maintenance", "lat": 1.47, "lng": 103.89}, 
-        {"region": "SEA", "country": "SINGAPORE", "company": "Aster Chemicals", "location": "Jurong Island", "capacity": 550, "status": "Normal", "lat": 1.27, "lng": 103.72}, 
-        {"region": "SEA", "country": "SINGAPORE", "company": "Shell Chemicals Seraya", "location": "Jurong Island", "capacity": 390, "status": "Normal", "lat": 1.27, "lng": 103.72}, 
-        {"region": "SEA", "country": "THAILAND", "company": "IRPC Public Company", "location": "Mueang Rayong", "capacity": 260, "status": "Normal", "lat": 12.68, "lng": 101.28}, 
-        {"region": "SEA", "country": "THAILAND", "company": "Siam Styrene Monomer", "location": "Mueang Rayong", "capacity": 300, "status": "Normal", "lat": 12.68, "lng": 101.28}, 
-        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Styrolution L1", "location": "Antwerp", "capacity": 310, "status": "Normal", "lat": 51.22, "lng": 4.4}, 
-        {"region": "Western Europe", "country": "BELGIUM", "company": "INEOS Styrolution L2", "location": "Antwerp", "capacity": 250, "status": "Normal", "lat": 51.22, "lng": 4.4}, 
-        {"region": "Western Europe", "country": "FRANCE", "company": "TotalEnergies", "location": "Gonfreville-L'Orcher", "capacity": 630, "status": "Normal", "lat": 49.49, "lng": 0.23}, 
-        {"region": "Western Europe", "country": "GERMANY", "company": "BASF SE", "location": "Ludwigshafen", "capacity": 550, "status": "Normal", "lat": 49.48, "lng": 8.46}, 
-        {"region": "Western Europe", "country": "ITALY", "company": "Eni Rewind", "location": "Mantova", "capacity": 430, "status": "Normal", "lat": 45.16, "lng": 10.79}, 
-        {"region": "Western Europe", "country": "ITALY", "company": "Versalis SpA", "location": "Mantova", "capacity": 190, "status": "Normal", "lat": 45.16, "lng": 10.79}, 
-        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Ellba C.V.", "location": "Moerdijk", "capacity": 550, "status": "Normal", "lat": 51.68, "lng": 4.63}, 
-        {"region": "Western Europe", "country": "NETHERLANDS", "company": "Shell Nederland Chemie", "location": "Moerdijk", "capacity": 450, "status": "Normal", "lat": 51.68, "lng": 4.63}, 
-        {"region": "Western Europe", "country": "SPAIN", "company": "Repsol Quimica SA", "location": "La Pobla de Mafumet", "capacity": 490, "status": "Maintenance", "lat": 41.11, "lng": 1.25}, 
-        {"region": "Middle East", "country": "IRAN", "company": "Pars Petrochemical Co", "location": "Asaluyeh", "capacity": 630, "status": "Normal", "lat": 27.48, "lng": 52.61}, 
-        {"region": "Middle East", "country": "IRAN", "company": "Tabriz Petrochemical", "location": "Tabriz", "capacity": 95, "status": "Normal", "lat": 38.07, "lng": 46.29}, 
-        {"region": "Middle East", "country": "KUWAIT", "company": "The Kuwait Styrene Co", "location": "Shuaiba", "capacity": 540, "status": "Trouble", "lat": 29.04, "lng": 48.16}, 
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Petrokemya (SABIC) L1", "location": "Al Jubail Industrial City", "capacity": 580, "status": "Trouble", "lat": 27.01, "lng": 49.66}, 
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Petrokemya (SABIC) L2", "location": "Al Jubail Industrial City", "capacity": 580, "status": "Trouble", "lat": 27.01, "lng": 49.66}, 
-        {"region": "Middle East", "country": "SAUDI ARABIA", "company": "Jubail Chevron Phillips (JCP)", "location": "Al Jubail Industrial City", "capacity": 750, "status": "Normal", "lat": 27.01, "lng": 49.66}, 
-        {"region": "North America", "country": "CANADA", "company": "Shell Chemicals Canada", "location": "Fort Saskatchewan", "capacity": 450, "status": "Normal", "lat": 53.71, "lng": -113.21}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "Americas Styrenics L1", "location": "St. James", "capacity": 500, "status": "Normal", "lat": 30.01, "lng": -90.85}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "Americas Styrenics L2", "location": "St. James", "capacity": 453, "status": "Normal", "lat": 30.01, "lng": -90.85}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar Company (L1)", "location": "Carville", "capacity": 567, "status": "Trouble", "lat": 30.22, "lng": -91.1}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "Cos-Mar Company (L2)", "location": "Carville", "capacity": 567, "status": "Trouble", "lat": 30.22, "lng": -91.1}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Styrolution Pasadena", "location": "Pasadena", "capacity": 771, "status": "Normal", "lat": 29.7, "lng": -95.2}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "INEOS Styrolution Texas City", "location": "Texas City", "capacity": 454, "status": "Normal", "lat": 29.38, "lng": -94.9}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "PO JV (Lyondell) L1", "location": "Channelview", "capacity": 700, "status": "Normal", "lat": 29.81, "lng": -95.12}, 
-        {"region": "North America", "country": "UNITED STATES", "company": "PO JV (Lyondell) L2", "location": "Channelview", "capacity": 700, "status": "Normal", "lat": 29.81, "lng": -95.12}, 
-        {"region": "South America", "country": "ARGENTINA", "company": "Pampa Energia SA", "location": "Puerto General San Martin", "capacity": 160, "status": "Normal", "lat": -32.72, "lng": -60.73}, 
-        {"region": "South America", "country": "BRAZIL", "company": "Companhia Brasileira de Estireno", "location": "Cubatao", "capacity": 120, "status": "Normal", "lat": -23.89, "lng": -46.42}, 
-        {"region": "South America", "country": "BRAZIL", "company": "Videolar-Innova S.A.", "location": "Triunfo", "capacity": 420, "status": "Normal", "lat": -29.94, "lng": -51.35}
-    ];
+    const ADMIN_PASS = "jskim0111";
+    // ── GAS URL (구글시트 직접 연동 → Apps Script 경유로 변경) ──
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxjrK_7vTF-n9fO9QPIVCjKvQw3a9vOMxJQJJ4GEG_l4dAw244j5jfwi1qVaGBEUrLd/exec';
+    const layers = {
+        "Standard": L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'),
+        "Satellite": L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'),
+        "Dark": L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png')
+    };
+    const map = L.map('map', {zoomControl: false, zoomAnimation: true}).setView([20, 100], 3);
+    layers.Standard.addTo(map); L.control.layers(layers).addTo(map);
+   
+    let currentProd = 'SM', activeMarkers = [], currentRawData = [], countryChart = null;
 
-    // --- BI 대시보드 로직 (123개 사이트 전수 적용) ---
-    const map = L.map('map', { zoomControl: false }).setView([25, 40], 3);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
-
-    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('hidden'); }
-    function resetMapView() { map.flyTo([25, 40], 3, { duration: 1.5 }); }
-
-    const globalTotal = plants.reduce((sum, p) => sum + p.capacity, 0);
-    document.getElementById('global-val').innerText = globalTotal.toLocaleString();
-
-    const nested = {};
-    plants.forEach(p => {
-        if (!nested[p.region]) nested[p.region] = { capa: 0, countries: {} };
-        if (!nested[p.region].countries[p.country]) nested[p.region].countries[p.country] = { capa: 0, plants: [] };
-        nested[p.region].capa += p.capacity;
-        nested[p.region].countries[p.country].capa += p.capacity;
-        nested[p.region].countries[p.country].plants.push(p);
-
-        const isIssue = (p.status !== 'Normal');
-        const markerColor = isIssue ? '#1A1A1B' : '#1597BB';
-        const marker = L.circleMarker([p.lat, p.lng], {
-            radius: Math.sqrt(p.capacity) * 1.3, fillColor: markerColor, color: '#fff', weight: 1.5, fillOpacity: 0.8
-        }).addTo(map);
-        marker.bindPopup(`<b>${p.company}</b><br>Loc: ${p.location}<br>Capa: ${p.capacity}K MT/Y<br>Status: <b style="color:${isIssue?'red':'green'}">${p.status}</b>`);
-        p._m = marker;
-    });
-
-    const container = document.getElementById('list-container');
-    Object.entries(nested).sort((a,b)=>b[1].capa - a[1].capa).forEach(([rName, rData]) => {
-        const rPct = ((rData.capa / globalTotal) * 100).toFixed(1);
-        const rGroup = document.createElement('div');
-        rGroup.className = 'region-group';
-        rGroup.innerHTML = `<div class="region-header" onclick="this.parentElement.classList.toggle('open');">
-            <span>${rName}</span><span>${rData.capa.toLocaleString()}K (${rPct}%)</span></div>`;
-
-        const cGroupContainer = document.createElement('div');
-        cGroupContainer.className = 'country-group';
-        Object.entries(rData.countries).sort((a,b)=>b[1].capa - a[1].capa).forEach(([cName, cData]) => {
-            const cPct = ((cData.capa / globalTotal) * 100).toFixed(1);
-            const cItem = document.createElement('div');
-            cItem.className = 'country-item';
-            cItem.innerHTML = `<div class="country-header" onclick="this.parentElement.classList.toggle('open');">
-                <span>${cName}</span><span>${cData.capa.toLocaleString()}K (${cPct}%)</span></div>`;
-
-            const pList = document.createElement('div');
-            pList.className = 'plant-list';
-            cData.plants.forEach(p => {
-                const isIssue = (p.status !== 'Normal');
-                const card = document.createElement('div');
-                card.className = `plant-card ${isIssue ? 'issue' : ''}`;
-                card.innerHTML = `<div class="plant-name"><span>${p.company}</span><span class="badge ${isIssue?'black':''}">${p.status}</span></div>
-                    <div style="margin-top:4px; font-size:0.75rem;">${p.location} | Capa: ${p.capacity}K MT/Y</div>`;
-                card.onclick = (e) => { e.stopPropagation(); map.flyTo([p.lat, p.lng], 9); setTimeout(() => p._m.openPopup(), 1600); };
-                pList.appendChild(card);
+    function showUpdateModal() { document.getElementById('admin-password').value = ""; document.getElementById('auth-section').style.display = 'block'; document.getElementById('data-input-section').style.display = 'none'; document.getElementById('update-modal').style.display = 'block'; }
+    function closeModal() { document.getElementById('update-modal').style.display = 'none'; }
+    function verifyAdmin() { if (document.getElementById('admin-password').value === ADMIN_PASS) { document.getElementById('auth-section').style.display = 'none'; document.getElementById('data-input-section').style.display = 'block'; } else { alert("암호 불일치."); } }
+   
+    function parseUniversal(text) {
+        const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
+        if(lines.length < 2) return [];
+        const del = lines[0].includes('\t') ? '\t' : ',';
+        const heads = lines[0].split(del).map(h => h.trim().toLowerCase().replace(/\s+/g, '_').replace(/[().]/g, ''));
+       
+        return lines.slice(1).map(line => {
+            const vals = line.split(del); let obj = {};
+            heads.forEach((h, i) => {
+                let v = vals[i] ? vals[i].trim() : "";
+                if(h.includes('capa') || h.includes('kmt')) obj['capacity'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('lat')) obj['lat'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('lng') || h.includes('long')) obj['lng'] = parseFloat(v.replace(/[^0-9.-]/g, "")) || 0;
+                else if(h.includes('start')) obj['start_date'] = v;
+                else if(h.includes('end')) obj['end_date'] = v;
+                else if(h.includes('status') || h.includes('remark') || h.includes('rmk')) obj['status'] = v;
+                else obj[h] = v;
             });
-            cItem.appendChild(pList);
-            cGroupContainer.appendChild(cItem);
+            if(!obj.company) obj.company = obj.site || obj.plant || "Unknown";
+            return obj;
         });
-        rGroup.appendChild(cGroupContainer);
-        container.appendChild(rGroup);
-    });
+    }
+
+    function flyToTarget(lat, lng, zoom, marker = null) {
+        const sidebarWidth = document.getElementById('sidebar').classList.contains('hidden') ? 0 : 320;
+        const targetPoint = map.project([lat, lng], zoom).subtract([sidebarWidth / 2, 0]);
+        map.flyTo(map.unproject(targetPoint, zoom), zoom, { duration: 1.5 });
+        if(marker) map.once('moveend', () => marker.openPopup());
+    }
+
+    function cleanDateStr(dStr) {
+        if(!dStr) return "";
+        return dStr.replace(/\./g, '-').replace(/\//g, '-').trim();
+    }
+
+    function getLossDays(startStr, endStr, mode, isCurrent = false) {
+        if (!startStr || startStr === "") return 0;
+       
+        const s = cleanDateStr(startStr);
+        let e = cleanDateStr(endStr);
+
+        // 핵심: 종료일이 없는데 Current 리스크라면 이번 달 말일(2026-02-28)로 강제 설정
+        if ((!e || e === "") && isCurrent) {
+            e = "2026-02-28";
+        } else if (!e || e === "") {
+            return 0;
+        }
+
+        const pS = new Date(s); const pE = new Date(e);
+        if (isNaN(pS) || isNaN(pE)) return 0;
+        if (mode === 'total') return Math.max(0, Math.floor((pE - pS) / 86400000) + 1);
+       
+        const now = new Date(2026, 1, 17);
+        const mS = new Date(now.getFullYear(), now.getMonth(), 1);
+        const mE = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+       
+        const iS = new Date(Math.max(mS, pS));
+        const iE = new Date(Math.min(mE, pE));
+       
+        return (iS > iE) ? 0 : Math.floor((iE - iS) / 86400000) + 1;
+    }
+
+    function buildHistoryItems(summaryStr) {
+        if (!summaryStr || summaryStr === "0") return '<tr><td colspan="4" style="text-align:center; color:#ccc; padding:10px;">기록이 없습니다.</td></tr>';
+        const rows = summaryStr.split('|').map(h => {
+            const parts = h.split(':'); if (parts[1] && parts[1].includes('1899')) return '';
+            const status = (parts[0] || "").trim();
+            const statusLower = status.toLowerCase();
+            const isWarning = statusLower.includes('shutdown') || statusLower.includes('maintenance') || statusLower.includes('current') || statusLower.includes('trouble');
+            return `<tr><td><span class="status-tag" style="background:${isWarning?'#E74C3C':'#27ae60'}">${status}</span></td><td>${parts[1]||'-'}</td><td><b>${parts[2]||'0'}d</b></td><td>${parts[3]||'-'}</td></tr>`;
+        }).filter(r => r !== '').join('');
+        return rows ? `<table class="history-table"><thead><tr><th>상태</th><th>날짜</th><th>일수</th><th>주기</th></tr></thead><tbody>${rows}</tbody></table>` : '<tr><td>기록없음</td></tr>';
+    }
+
+    function createPlantCard(p, totalCapa) {
+        const capa = parseFloat(p.capacity) || 0;
+        const statusStr = (p.status || "").toString();
+        const isC = statusStr.toLowerCase().includes('current');
+        const mDays = getLossDays(p.start_date, p.end_date, 'month', isC);
+        const loss = ((capa / 365) * mDays).toFixed(1);
+        const card = document.createElement('div'); card.className = 'plant-card';
+        card.innerHTML = `${(mDays>0)?`<span class="loss-badge">${loss}K</span>`:''}<b>${p.company}</b> <span style="color:#1597BB">(${((capa/totalCapa)*100).toFixed(1)}%)</span><div style="color:#666; font-size:0.65rem;">${capa}K | ${p.status||'Normal'}</div>`;
+        card.onclick = (e) => { e.stopPropagation(); flyToTarget(p.lat, p.lng, 7, p._m); }; return card;
+    }
+
+    function showCountryStats(countryName) {
+        const countryData = currentRawData.filter(p => (p.country || "").trim() === countryName && !(p.status && p.status.toString().toLowerCase().includes('deleted')));
+        if (countryData.length === 0) return;
+        const totalCapa = countryData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        const labels = countryData.map(p => p.company);
+        const data = countryData.map(p => parseFloat(p.capacity) || 0);
+        const ctx = document.getElementById('country-chart').getContext('2d');
+        if (countryChart) countryChart.destroy();
+        document.getElementById('chart-country-name').innerText = `${countryName} Market Share (Total: ${Math.round(totalCapa).toLocaleString()}K)`;
+        document.getElementById('chart-panel').classList.add('active');
+        countryChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: ['#0A2647', '#1597BB', '#2ECC71', '#F1C40F', '#E74C3C', '#9B59B6', '#34495E', '#95A5A6', '#D35400', '#BDC3C7'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    datalabels: { color: 'white', font: { weight: 'bold', size: 10 }, formatter: (value, ctx) => { let sum = 0; let dataArr = ctx.chart.data.datasets[0].data; dataArr.map(data => { sum += data; }); return (value * 100 / sum).toFixed(1) + "%"; } },
+                    legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 } } }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+    }
+
+    async function switchProduct(prod) {
+        currentProd = prod;
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.id === `btn-${prod}`));
+        const ovl = document.getElementById('sync-overlay');
+        ovl.style.display = 'flex'; ovl.style.opacity = '1';
+        document.getElementById('sync-main-text').innerText = `${prod} 데이터 동기화 중...`;
+        try {
+            // GAS URL 경유로 구글시트 데이터 fetch (사내 보안망 우회)
+            const url = GAS_URL + '?action=getAbsData&product=' + prod + '&t=' + new Date().getTime();
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const json = await res.json();
+            if (json.error) throw new Error(json.error);
+            currentRawData = json;
+            document.getElementById('sync-main-text').innerText = "✅ GAS 연동 완료!";
+        } catch(e) {
+            // GAS 연동 실패 시 픽스모드 안내
+            currentRawData = [];
+            document.getElementById('sync-main-text').innerText = "⚠️ 연동 실패: " + e.message;
+            console.error('GAS fetch 오류:', e);
+        } finally {
+            renderEverything(currentRawData);
+            setTimeout(() => { ovl.style.opacity = '0'; setTimeout(() => { ovl.style.display = 'none'; }, 600); }, 800);
+        }
+    }
+
+    function renderEverything(data) {
+        activeMarkers.forEach(m => map.removeLayer(m)); activeMarkers = [];
+        document.getElementById('current-risk-list').innerHTML='';
+        document.getElementById('future-risk-list').innerHTML='';
+        document.getElementById('region-list').innerHTML='';
+        if (!data || data.length === 0) return;
+
+        const activeData = data.filter(p => !(p.status && p.status.toString().toLowerCase().includes('deleted')));
+        const totalGlobalCapa = activeData.reduce((s, p) => s + (parseFloat(p.capacity) || 0), 0);
+        document.getElementById('global-val').innerText = Math.round(totalGlobalCapa).toLocaleString();
+        document.getElementById('total-sites').innerText = activeData.length;
+       
+        let totalCurrentLoss = 0;
+        const regs = {};
+
+        activeData.forEach(p => {
+            if(!p.lat || !p.lng) return;
+            const capa = parseFloat(p.capacity) || 0;
+            const statusStr = (p.status || "").toString().trim();
+            const statusLower = statusStr.toLowerCase();
+            const isC = statusLower.includes('current') || statusLower.includes('trouble');
+            const isF = statusLower.includes('future') || statusLower.includes('maintenance');
+           
+            // 종료일 부재 시 isC 기반으로 2월 말일까지 계산
+            const mDays = getLossDays(p.start_date, p.end_date, 'month', isC);
+            const tDays = getLossDays(p.start_date, p.end_date, 'total', isC);
+            const mLoss = (capa / 365) * mDays;
+            const tLoss = (capa / 365) * tDays;
+           
+            if(isC) totalCurrentLoss += mLoss;
+
+            // 마커 크기 50% 축소 (sqrt * 0.4)
+            const markerSize = Math.sqrt(capa) * 0.4;
+            let m;
+            if (isC || isF) {
+                const markerColor = isC ? '#1A1A1B' : '#D35400';
+                m = L.marker([p.lat, p.lng], {
+                    zIndexOffset: 1000,
+                    icon: L.divIcon({
+                        html: `<svg width="${markerSize*2.5}" height="${markerSize*2.5}" viewBox="0 0 24 24"><path d="M12 2L2 22H22L12 2Z" fill="${markerColor}" stroke="white" stroke-width="2"/></svg>`,
+                        className: 'custom-triangle',
+                        iconAnchor: [markerSize*1.25, markerSize*1.25]
+                    })
+                }).addTo(map);
+            } else {
+                m = L.circleMarker([p.lat, p.lng], {
+                    radius: markerSize, fillColor: '#5DADE2', color: 'white', fillOpacity: 0.9, weight: 1
+                }).addTo(map);
+            }
+
+            const lossPopupText = (mLoss > 0 || tLoss > 0) ? `<span style="color:#E74C3C"> (M:-${mLoss.toFixed(1)}K / T:-${tLoss.toFixed(1)}K)</span>` : '';
+            m.bindPopup(`<div style="min-width:280px; font-family:'Pretendard'; padding:5px;"><div style="font-size:1.1rem; font-weight:900; color:var(--primary); margin-bottom:10px; border-bottom:2px solid var(--accent); padding-bottom:5px;">${p.company}</div><div class="info-row"><span class="info-label">Region / Country</span><span class="info-value">${p.region || '-'} / ${p.country || '-'}</span></div><div class="info-row"><span class="info-label">Status</span><span class="info-value" style="color:#E74C3C; font-weight:900;">${statusStr || 'Normal'} (${p.start_date||''} ~ ${p.end_date||''})</span></div><div class="info-row"><span class="info-label">Capacity (Loss)</span><span class="info-value">${capa.toLocaleString()}K MT${lossPopupText}</span></div><div class="history-container"><div class="history-title">🕒 STATUS HISTORY</div>${buildHistoryItems(p.summary || p.history || p.history_data)}</div></div>`);
+           
+            m.on('click', (e) => { L.DomEvent.stopPropagation(e); flyToTarget(p.lat, p.lng, 7, m); });
+            activeMarkers.push(m); p._m = m;
+
+            const pCard = createPlantCard(p, totalGlobalCapa);
+            if(isC) document.getElementById('current-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+            else if(isF) document.getElementById('future-risk-list').appendChild(pCard.cloneNode(true)).onclick = pCard.onclick;
+
+            const r = p.region || "Other", c = p.country || "Other";
+            if (!regs[r]) regs[r] = { name: r, countries: {}, totalP: 0, totalC: 0, sLat: 0, sLng: 0 };
+            if (!regs[r].countries[c]) regs[r].countries[c] = { name: c, plants: [], cCapa: 0, sLat: 0, sLng: 0 };
+            regs[r].countries[c].plants.push(pCard);
+            regs[r].countries[c].cCapa += capa;
+            regs[r].totalP++; regs[r].totalC += capa; regs[r].sLat += p.lat; regs[r].sLng += p.lng;
+        });
+
+        Object.values(regs).sort((a,b) => b.totalP - a.totalP).forEach(r => {
+            const rDiv = document.createElement('div');
+            rDiv.innerHTML = `<div class="group-header region-header" onclick="this.parentElement.classList.toggle('open'); flyToTarget(${r.sLat/r.totalP}, ${r.sLng/r.totalP}, 4);"><span>${r.name} (${r.totalP}) <span class="header-stats" style="color:#C0392B;">${Math.round(r.totalC).toLocaleString()}K</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+            const rCont = rDiv.querySelector('.collapsible-content');
+            Object.values(r.countries).sort((a,b) => b.cCapa - a.cCapa).forEach(c => {
+                const cDiv = document.createElement('div');
+                cDiv.innerHTML = `<div class="group-header country-header" onclick="this.parentElement.classList.toggle('open');"><span>${c.name} (${c.plants.length}) <span class="header-stats" style="color:#1597BB; cursor:pointer;" onclick="event.stopPropagation(); showCountryStats('${c.name}')">${Math.round(c.cCapa).toLocaleString()}K 📊</span></span><span>▼</span></div><div class="collapsible-content"></div>`;
+                const cCont = cDiv.querySelector('.collapsible-content');
+                c.plants.forEach(card => cCont.appendChild(card));
+                rCont.appendChild(cDiv);
+            });
+            document.getElementById('region-list').appendChild(rDiv);
+        });
+       
+        const avgMonthlyCapa = totalGlobalCapa / 12;
+        document.getElementById('cur-loss-mt').innerText = totalCurrentLoss.toFixed(1) + "K";
+        document.getElementById('cur-ratio').innerText = totalGlobalCapa > 0 ? ((totalCurrentLoss / avgMonthlyCapa) * 100).toFixed(2) + "%" : "0.00%";
+        document.getElementById('cur-sum-h').innerText = totalCurrentLoss.toFixed(1) + "K ▼";
+    }
+
+    function resetToGlobal() { map.flyTo([20, 100], 3, { duration: 1.2 }); }
+    function closeChartPanel() { document.getElementById('chart-panel').classList.remove('active'); }
+    window.showCountryStats = showCountryStats;
+    window.onload = () => switchProduct('SM');
 </script>
 </body>
 </html>
