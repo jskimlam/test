@@ -173,8 +173,11 @@
     }
 
     function cleanDateStr(dStr) {
-        if(!dStr) return "";
-        return dStr.replace(/\./g, '-').replace(/\//g, '-').trim();
+        if(!dStr || dStr === "" || dStr === null || dStr === undefined) return "";
+        // GAS에서 숫자/Date 객체로 올 수 있으므로 강제 문자열 변환
+        var s = String(dStr).trim();
+        if(s === "0" || s === "NaN" || s === "undefined" || s === "null") return "";
+        return s.replace(/\./g, '-').replace(/\//g, '-').trim();
     }
 
     function getLossDays(startStr, endStr, mode, isCurrent = false) {
