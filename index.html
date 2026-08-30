@@ -63,6 +63,25 @@ body {
 }
 .m-btn-all:hover { background: #d4e9f7; }
 
+/* 탭 */
+.tab-bar {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.tab-btn {
+  padding: 8px 18px; border-radius: 7px 7px 0 0; font-size: 12px; font-weight: 700;
+  cursor: pointer; background: #dde4ea; color: #5a6c7d; border: 1px solid #ccd0d5; border-bottom: none;
+  transition: all 0.12s;
+}
+.tab-btn:hover { background: #eaf4fb; color: #1a5276; }
+.tab-btn.on { background: #fff; color: #1A5276; box-shadow: 0 -1px 4px rgba(0,0,0,0.06); }
+
+/* 차트 카드 */
+.chart-card {
+  background: #fff; border: 1px solid #d5dae0; border-radius: 8px;
+  padding: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow-x: auto;
+}
+#loss-canvas { display: block; margin: 0 auto; max-width: 100%; }
+
 /* 표시 토글 */
 .vtgl {
   padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 600;
@@ -196,6 +215,15 @@ body {
   </div>
 </div>
 
+<!-- 탭 -->
+<div class="tab-bar">
+  <div class="tab-btn on" id="tab-cal" onclick="switchTab('cal')">📅 캘린더</div>
+  <div class="tab-btn"    id="tab-chart" onclick="switchTab('chart')">📊 Loss 차트</div>
+</div>
+
+<!-- ══════════ 캘린더 뷰 ══════════ -->
+<div id="view-calendar">
+
 <!-- 컨트롤 -->
 <div class="ctrl-bar">
   <span class="ctrl-lbl">📅 월</span>
@@ -224,6 +252,35 @@ body {
   <div class="leg-i"><div class="leg-d" style="background:#E74C3C;"></div>긴급/비계획 정지</div>
   <div class="leg-i"><div class="leg-d" style="background:#3498DB;"></div>예정 보수</div>
   <div class="leg-i" style="margin-left:8px;color:#f39c12;">│ 현재주차</div>
+</div>
+
+</div>
+
+<!-- ══════════ Loss 차트 뷰 ══════════ -->
+<div id="view-chart" style="display:none;">
+
+  <div class="ctrl-bar">
+    <span class="ctrl-lbl">📊 그래프</span>
+    <div style="display:flex;gap:3px;">
+      <div class="vtgl on" id="ct-bar"  onclick="setChartType('bar')">막대</div>
+      <div class="vtgl"    id="ct-line" onclick="setChartType('line')">선형</div>
+    </div>
+    <div style="width:1px;height:20px;background:#2a3d65;"></div>
+    <span class="ctrl-lbl">📐 값</span>
+    <div style="display:flex;gap:3px;">
+      <div class="vtgl on" id="cm-pct" onclick="setChartMetric('pct')">Loss율 (%)</div>
+      <div class="vtgl"    id="cm-kt"  onclick="setChartMetric('kt')">Loss (kt)</div>
+    </div>
+    <div style="width:1px;height:20px;background:#2a3d65;"></div>
+    <span class="ctrl-lbl" style="color:#9fb3c8;">※ 상단 월 필터 연동됨</span>
+  </div>
+
+  <div class="chart-card">
+    <canvas id="loss-canvas" width="1200" height="480"></canvas>
+  </div>
+
+  <div class="legend" id="chart-legend"></div>
+
 </div>
 
 <div id="xl-clone"></div>
@@ -299,7 +356,166 @@ function loadData() {
   showToast('2026-08-28 주간 갱신 기준 데이터 (정적 스냅샷)', 'ok', 3500);
 }
 
-function renderAll() { renderStats(); renderSections(); }
+function renderAll() {
+  renderStats();
+  renderSections();
+  if (curTab === 'chart') renderChart();
+}
+
+// ════════════════════════════════════════════
+// 탭 전환
+// ════════════════════════════════════════════
+var curTab = 'cal';
+function switchTab(t) {
+  curTab = t;
+  document.getElementById('tab-cal').classList.toggle('on', t === 'cal');
+  document.getElementById('tab-chart').classList.toggle('on', t === 'chart');
+  document.getElementById('view-calendar').style.display = t === 'cal' ? '' : 'none';
+  document.getElementById('view-chart').style.display    = t === 'chart' ? '' : 'none';
+  if (t === 'chart') renderChart();
+}
+
+// ════════════════════════════════════════════
+// Loss 차트 (품목별 월간 Loss kt / Loss율%)
+// ════════════════════════════════════════════
+var chartType   = 'bar';  // 'bar' | 'line'
+var chartMetric = 'pct';  // 'pct' | 'kt'
+
+function setChartType(v) {
+  chartType = v;
+  document.getElementById('ct-bar').classList.toggle('on', v === 'bar');
+  document.getElementById('ct-line').classList.toggle('on', v === 'line');
+  renderChart();
+}
+function setChartMetric(v) {
+  chartMetric = v;
+  document.getElementById('cm-pct').classList.toggle('on', v === 'pct');
+  document.getElementById('cm-kt').classList.toggle('on', v === 'kt');
+  renderChart();
+}
+
+function computeChartData() {
+  var months = getSelMonths();
+  if (months.length === 0) { months = []; for (var m=1;m<=12;m++) months.push(m); }
+
+  var series = {};
+  PRODS.forEach(function(p) {
+    var rows    = allData[p.key] || [];
+    var totCap  = rows.reduce(function(s,r){ return s+(r.capacity||0); }, 0);
+    var kt  = [];
+    var pct = [];
+    months.forEach(function(m) {
+      var lossKt = rows.reduce(function(s,r){ return s + calcRowLoss(r, m); }, 0);
+      kt.push(lossKt);
+      pct.push(totCap > 0 ? (lossKt / totCap * 100) : 0);
+    });
+    series[p.key] = { kt: kt, pct: pct, color: p.secColor, totCap: totCap };
+  });
+  return { months: months, series: series };
+}
+
+function renderChart() {
+  var cd  = computeChartData();
+  var cv  = document.getElementById('loss-canvas');
+  var ctx = cv.getContext('2d');
+  var W = cv.width, H = cv.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // 레이아웃
+  var padL = 55, padR = 20, padT = 25, padB = 45;
+  var plotW = W - padL - padR;
+  var plotH = H - padT - padB;
+
+  var unit = chartMetric === 'pct' ? '%' : 'kt';
+  var keys = PRODS.map(function(p){ return p.key; });
+
+  // 최대값 계산 (여유 15%)
+  var maxV = 0;
+  keys.forEach(function(k) {
+    cd.series[k][chartMetric].forEach(function(v){ if (v > maxV) maxV = v; });
+  });
+  maxV = maxV <= 0 ? 1 : maxV * 1.15;
+
+  // 축/그리드
+  ctx.strokeStyle = '#dfe4e8'; ctx.fillStyle = '#5a6c7d';
+  ctx.font = '11px Arial'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  var nGrid = 5;
+  for (var g = 0; g <= nGrid; g++) {
+    var gv = maxV * g / nGrid;
+    var gy = padT + plotH - (gv / maxV) * plotH;
+    ctx.beginPath(); ctx.moveTo(padL, gy); ctx.lineTo(padL + plotW, gy); ctx.stroke();
+    ctx.fillText(gv.toFixed(chartMetric === 'pct' ? 1 : 0), padL - 8, gy);
+  }
+  // Y축 단위 라벨
+  ctx.save();
+  ctx.translate(14, padT + plotH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillStyle = '#7f8c8d'; ctx.font = 'bold 11px Arial';
+  ctx.fillText(unit === '%' ? 'Loss율 (%)' : 'Loss (kt)', 0, 0);
+  ctx.restore();
+
+  // X축 월 라벨
+  var n = cd.months.length;
+  var slotW = plotW / n;
+  ctx.fillStyle = '#4a6078'; ctx.font = '11px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  cd.months.forEach(function(m, i) {
+    var cx = padL + slotW * (i + 0.5);
+    ctx.fillText(MN[m-1], cx, padT + plotH + 8);
+  });
+
+  // 축 선
+  ctx.strokeStyle = '#b7c0c9';
+  ctx.beginPath(); ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH); ctx.stroke();
+
+  if (chartType === 'bar') {
+    var groupPad = slotW * 0.18;
+    var barW = (slotW - groupPad * 2) / keys.length;
+    cd.months.forEach(function(m, i) {
+      keys.forEach(function(k, ki) {
+        var v  = cd.series[k][chartMetric][i];
+        var bh = (v / maxV) * plotH;
+        var bx = padL + slotW * i + groupPad + ki * barW;
+        var by = padT + plotH - bh;
+        ctx.fillStyle = cd.series[k].color;
+        ctx.fillRect(bx + 1, by, barW - 2, bh);
+        if (v > 0) {
+          ctx.fillStyle = '#2c3e50'; ctx.font = '9px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+          ctx.fillText(v.toFixed(chartMetric==='pct'?1:0), bx + barW/2, by - 2);
+        }
+      });
+    });
+  } else {
+    keys.forEach(function(k) {
+      var vals = cd.series[k][chartMetric];
+      ctx.strokeStyle = cd.series[k].color;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      vals.forEach(function(v, i) {
+        var cx = padL + slotW * (i + 0.5);
+        var cy = padT + plotH - (v / maxV) * plotH;
+        if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+      });
+      ctx.stroke();
+      vals.forEach(function(v, i) {
+        var cx = padL + slotW * (i + 0.5);
+        var cy = padT + plotH - (v / maxV) * plotH;
+        ctx.fillStyle = cd.series[k].color;
+        ctx.beginPath(); ctx.arc(cx, cy, 3.2, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#2c3e50'; ctx.font = '9px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        if (v > 0) ctx.fillText(v.toFixed(chartMetric==='pct'?1:0), cx, cy - 6);
+      });
+    });
+  }
+
+  // 범례
+  var legHtml = '';
+  PRODS.forEach(function(p) {
+    var tot = cd.series[p.key].totCap;
+    legHtml += '<div class="leg-i"><div class="leg-d" style="background:' + p.secColor + ';"></div>'
+             + p.key + ' <span style="color:#9fb3c8;">(총 Capa ' + Math.round(tot) + 'kt)</span></div>';
+  });
+  document.getElementById('chart-legend').innerHTML = legHtml;
+}
 
 // ════════════════════════════════════════════
 // 통계 뱃지
